@@ -94,7 +94,7 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Run fresh configure/build, focused tests, finite rendered/media smokes, Xvfb preview startup, and GPU 1 identity checks.
 - [x] Measure geometry load separately from render, readback, reconstruction, KLT/mask, centroid, YOLO, preview, and dropped frames. Report eight- and 32-sample runs separately; make no unmeasured FPS claim.
 - [x] Document quick-start commands, modes, controls, asset/model paths, resolved-body limits of space-aware extraction, camera limitations, and deferred models.
-- [ ] Review full final diff and plan state; commit remaining demo-only work. Do not push or open a PR.
+- [x] Review full final diff and plan state; commit remaining demo-only work. Do not push or open a PR.
 
 ## Review, commit, and comment rules
 
@@ -160,12 +160,13 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 - `build/final_timed_sphere_8`: three 8-spp frames; after first-frame work, render 9.4 ms, readback 2.0 ms, reconstruction 14.0-14.2 ms, KLT 78.0-79.4 ms, centroid 37.8-39.5 ms. `build/final_timed_sphere_32`: one 32-spp reference; render 42.0 ms, readback 2.0 ms, reconstruction 14.4 ms, KLT 97.8 ms. These are stage times, not end-to-end FPS claims.
 - Interactive Xvfb preview upload/draw/swap averaged 13.9 ms for two rendered frames and 5.6 ms for two camera frames. The YOLO dog first inference took 487.0 ms; a second video frame took 15.5 ms after warmup. These observations are input- and run-specific.
 - `--albedo-jpeg` decoded the full 15708 x 7854 Bennu JPEG and reached the expected current Spectra-RT error: `Factorized transport requires achromatic material coefficients and no albedo textures.` The prepared patch adds scalar-only admission and a focused GPU comparison test; RGB/RGBA rejection remains. `git apply --check patches/0001-admit-scalar-albedo-in-factorized-transport.patch` passes against Spectra-RT `f948bd6`. No patch was applied there, so textured output and its GPU test remain pending user approval for that external source edit.
-- Stage 5 review: inspected texture conversion, scalar upload behavior, material admission and update paths, diagnostics, and the focused test in the patch. Stage 6 review: ran `clang-format --dry-run --Werror`, CTest, fresh ML and no-ML builds, JSON/PNG checks, FFprobe, external dirty-state recheck, and the full source/documentation readability pass. The source hash is recorded below; documentation is undergoing staged review.
+- Stage 5 review: inspected texture conversion, scalar upload behavior, material admission and update paths, diagnostics, and the focused test in the patch. Stage 6 review: ran `clang-format --dry-run --Werror`, CTest, fresh ML and no-ML builds, JSON/PNG checks, FFprobe, external dirty-state recheck, and the full source/documentation readability pass. After the rotation change, rebuilt ML and no-ML targets, reran CTest, rejected invalid spin and azimuth arguments, checked static sphere metadata, and reviewed the phase-sweep frames. Both source and documentation batches passed complete staged-diff checks.
 
 ### Commits
 
 - `f5b6150` `[MAJOR] Stream renderer and camera frames through perception`: staged 14 explicit source/config/test paths, reviewed the complete index, passed `git diff --cached --check`, and committed only this repo. The source programs share CMake and `demo_core`, so their functioning integration formed one cohesive source batch; the plan and operating instructions follow separately.
-- Pending: review and commit this plan, README, and the unapplied Spectra-RT patch artifact.
+- `38cf534` `Document demo operation and prepare scalar-albedo patch`: staged only `.gitattributes`, this plan, README, and the unapplied patch; reviewed their complete diff and passed `git diff --cached --check`. The path-specific attribute excludes inherent unified-diff context spaces from that whitespace check. The patch still passes `git apply --check` at Spectra-RT `f948bd6` and remains unapplied.
+- The final plan-ledger commit marks the completed local review and keeps physical webcam, physical input-event, and textured-Bennu checks unchecked until they can run.
 
 ### Requested rotation and phase-angle extension
 
