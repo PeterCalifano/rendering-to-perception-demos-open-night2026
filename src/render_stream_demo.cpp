@@ -44,8 +44,8 @@ namespace
 {
 using Clock = std::chrono::steady_clock;
 using gdt::vec3f;
-// Use the nominal PDS period and model +Z pole for demonstration spin.
-constexpr double bennu_spin_period_s = 4.29746 * 3600.0;
+// Use the OSIRIS-REx 2018 period and the model +Z pole for demonstration spin.
+constexpr double bennu_spin_period_s = 4.296007 * 3600.0;
 constexpr double radians_per_degree = std::numbers::pi_v<double> / 180.0;
 
 struct SOptions

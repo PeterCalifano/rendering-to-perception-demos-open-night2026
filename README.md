@@ -74,7 +74,7 @@ CUDA_VISIBLE_DEVICES=1 build/demo/render_stream_demo --scene sphere \
 
 The default rendered mode is `klt`; `centroid` and `both` require `--centroid-model` and an ML build. The default scene is an illuminated sphere for quick checks. Bennu loads its full 17-million-triangle OBJ and UVs from `RENDERING_DATA`; `--model` can supply another OBJ. View presets are `whole_body`, `approach`, and `surface`.
 
-Bennu rotates about its model `+Z` axis using elapsed wall time and the [NASA PDS nominal sidereal period of 4.29746 hours](https://pds.nasa.gov/ds-view/pds/viewProfile.jsp?dsid=EAR-A-I0037-5-BENNUSHAPE-V1.0). `--spin-multiplier 1` is the default physical rate; `0` freezes the body, and values above 1 accelerate it. The multiplier changes body orientation only. The sphere fixture stays static. This is a nominal spin about the model pole, without a dated attitude or orbital ephemeris. At 1x, rotation is barely visible in a short run.
+Bennu rotates about its model `+Z` axis using elapsed wall time and the [4.296007-hour sidereal period measured during the 2018 OSIRIS-REx approach](https://www.nature.com/articles/s41467-019-09213-x). [NASA PDS identifies model `+Z` as the spin pole](https://pds.nasa.gov/ds-view/pds/viewProfile.jsp?dsid=EAR-A-I0037-5-BENNUSHAPE-V1.0). `--spin-multiplier 1` is the default measured rate; `0` freezes the body, and values above 1 accelerate it. The multiplier changes body orientation only. The sphere fixture stays static. The rate is fixed at that reference value; this run has no dated attitude or orbital ephemeris. At 1x, rotation is barely visible in a short run.
 
 The finite Sun stays fixed in world coordinates at 1 AU along `[1,1,0.3]`. Camera movement changes the Sun–body–camera phase angle; body spin changes which facets face the light. Use `--camera-azimuth-deg` to set the initial camera angle and `--orbit-step-deg` for a reproducible camera step per rendered frame. Dragging and arrow controls remain available during interactive preview. `R` restores the selected view and initial azimuth. `run.json` records the Sun motion, spin period and multiplier, and camera commands. Each rendered frame reports its phase angle, body rotation phase, and scene-instance update time in the overlay and JSONL.
 
@@ -97,9 +97,9 @@ ffmpeg -framerate 6 -i build/evidence_bennu_phase_sweep/frames/frame_%06d.png \
   -c:v libx264 -crf 18 -pix_fmt yuv420p build/evidence_bennu_phase_sweep.mp4
 ```
 
-The MP4 playback rate is an encoding choice, not a measured online frame rate. The frame summaries and PNGs come directly from the running renderer and perception pipeline.
+The MP4 playback rate is an encoding choice, not a measured online frame rate. Camera steps are per rendered frame, while body spin follows elapsed wall time, so the exact body phase at each frame depends on processing time. The frame summaries and PNGs come directly from the running renderer and perception pipeline.
 
-The overlay uses up to eight recent positions per surviving KLT ID. Old positions are red, the middle is orange, and the current point is yellow. This bounded cache is for drawing only; KLT owns the IDs and track lifetime.
+The overlay uses up to eight recent positions per surviving KLT ID. Old positions are red, the middle is orange, and the current point is yellow. This bounded cache is for drawing only; KLT owns the IDs and track lifetime. At large phase angles, the lit surface narrows and retained KLT tracks near the terminator need independent geometric validation.
 
 The optional `--albedo-jpeg FILE` path decodes a grayscale or BGR JPEG, converts sRGB to linear luminance, quantizes one channel, and binds it as Lambertian albedo. **It currently reaches Spectra-RT's factorized texture-admission error.** [The review patch](patches/0001-admit-scalar-albedo-in-factorized-transport.patch) targets Spectra-RT `f948bd6` and passes `git apply --check`; it has not been applied or GPU-tested. After approval to edit that checkout, rebuild and install Spectra-RT before using:
 
