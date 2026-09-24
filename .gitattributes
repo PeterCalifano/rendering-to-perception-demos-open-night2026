@@ -1,0 +1,2 @@
+# Ignore unified-diff context spaces in staged whitespace checks.
+patches/*.patch whitespace=-blank-at-eol

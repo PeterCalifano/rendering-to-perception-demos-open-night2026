@@ -1,0 +1,150 @@
+--- a/src/scene/CSceneMaterials.h
++++ b/src/scene/CSceneMaterials.h
+@@ -120,7 +120,7 @@
+          */
+         [[nodiscard]] const SHapkeFullCoefficients *fullHapke(size_t meshIndex) const;
+ 
+-        /// @return Whether every material meets achromatic, texture-free factorized admission.
++        /// @return Whether every material meets achromatic, scalar-texture factorized admission.
+         [[nodiscard]] bool supportsFactorized() const noexcept { return nonFactorizedCount_ == 0; }
+ 
+         /// @return Whether every material can use the opaque reflection profile.
+@@ -144,8 +144,8 @@
+         };
+ 
+         static SRecord Resolve(const SMaterialDescriptor &material, const STriangleMesh &mesh,
+-                               size_t textureCount);
+-        static bool SupportsFactorized(const SRecord &record);
++                               const CTriangMeshedModel &model);
++        static bool SupportsFactorized(const SRecord &record, const CTriangMeshedModel &model);
+         static bool SupportsScalarInterfaces(const SRecord &record);
+ 
+         struct SAssetRange
+--- a/src/scene/CSceneMaterials.cpp
++++ b/src/scene/CSceneMaterials.cpp
+@@ -22,7 +22,7 @@
+ 
+     CSceneMaterials::SRecord CSceneMaterials::Resolve(const SMaterialDescriptor &material,
+                                                       const STriangleMesh &mesh,
+-                                                      const size_t textureCount)
++                                                      const CTriangMeshedModel &model)
+     {
+         SRecord record{CBsdfParameters::resolve(material), material.diffuseAlbedoTextureID, nullptr, nullptr};
+ 
+@@ -34,8 +34,9 @@
+ 
+         if (record.textureIndex >= 0)
+         {
+-            if (static_cast<size_t>(record.textureIndex) >= textureCount)
++            if (static_cast<size_t>(record.textureIndex) >= model.getNumberOfTextures())
+                 throw std::invalid_argument("Material texture index is outside the scene registry.");
++            model.getTextureAtIndex(record.textureIndex).validate();
+             if (mesh.texcoord.size() != mesh.vertex.size())
+                 throw std::invalid_argument("Albedo textures require one UV per vertex.");
+             for (const auto &uv : mesh.texcoord)
+@@ -87,9 +88,12 @@
+         return record;
+     }
+ 
+-    bool CSceneMaterials::SupportsFactorized(const SRecord &record)
+-    {
+-        if (record.textureIndex >= 0)
++    bool CSceneMaterials::SupportsFactorized(const SRecord &record,
++                                             const CTriangMeshedModel &model)
++    {
++        // Admit only one-channel images as achromatic after RGBA upload.
++        if (record.textureIndex >= 0 &&
++            model.getTextureAtIndex(record.textureIndex).channels != 1U)
+             return false;
+         switch (record.parameters.type())
+         {
+@@ -177,8 +181,8 @@
+                                      static_cast<size_t>(texture) - asset.firstTexture >= asset.textureCount))
+                     throw std::invalid_argument("Initial material texture index is outside its asset registry.");
+ 
+-                auto record = Resolve(mesh.material, mesh, model.getNumberOfTextures());
+-                nonFactorizedCount_ += !SupportsFactorized(record);
++                auto record = Resolve(mesh.material, mesh, model);
++                nonFactorizedCount_ += !SupportsFactorized(record, model);
+                 nonOpaqueCount_ += !record.parameters.supportsOpaqueTransport();
+                 nonScalarInterfaceCount_ += !SupportsScalarInterfaces(record);
+                 records_[index] = std::move(record);
+@@ -216,7 +220,7 @@
+                 material.diffuseAlbedoTextureID = static_cast<int>(globalTexture);
+             }
+             replacements.push_back({index, Resolve(material,
+-                                                   model.getMeshAtIndex(static_cast<int>(index)), model.getNumberOfTextures())});
++                                                   model.getMeshAtIndex(static_cast<int>(index)), model)});
+         }
+         std::sort(replacements.begin(), replacements.end(),
+                   [](const auto &a, const auto &b)
+@@ -233,8 +237,8 @@
+                 throw std::invalid_argument("Duplicate material update target.");
+             changed.push_back(replacement.meshIndex);
+             const auto &previous = records_[replacement.meshIndex];
+-            nextNonFactorized -= !SupportsFactorized(previous);
+-            nextNonFactorized += !SupportsFactorized(replacement.record);
++            nextNonFactorized -= !SupportsFactorized(previous, model);
++            nextNonFactorized += !SupportsFactorized(replacement.record, model);
+             nextNonOpaque -= !previous.parameters.supportsOpaqueTransport();
+             nextNonOpaque += !replacement.record.parameters.supportsOpaqueTransport();
+             nextNonScalarInterface -= !SupportsScalarInterfaces(previous);
+@@ -242,7 +246,7 @@
+         }
+ 
+         if (requireFactorized && nextNonFactorized != 0)
+-            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and no albedo textures.");
++            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and only single-channel albedo textures.");
+         if (requireOpaque && nextNonOpaque != 0)
+             throw std::invalid_argument("Material requires the generic surface transport profile.");
+ 
+--- a/src/core/CSpectralRaytracer.cpp
++++ b/src/core/CSpectralRaytracer.cpp
+@@ -2912,7 +2912,7 @@
+         if (radiometryMode == ERadiometryMode::FACTORIZED_SPECTRAL &&
+             !materials.supportsFactorized())
+         {
+-            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and no albedo textures.");
++            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and only single-channel albedo textures.");
+         }
+         if (radiometryMode == ERadiometryMode::FULL_SPECTRAL &&
+             !materials.supportsScalarInterfaces())
+--- a/tests/core/testFactorizedTransport.cpp
++++ b/tests/core/testFactorizedTransport.cpp
+@@ -1201,6 +1201,36 @@
+     }
+ }
+ 
++TEST_CASE("Single-channel albedo textures scale factorized Lambertian and Lommel-Seeliger transport",
++          "[core][render][factorized][texture]")
++{
++    if (!HasGpu()) SKIP("A CUDA device is required for transport tests.");
++    image_io::SImageData texture;
++    texture.width = texture.height = 1U;
++    texture.channels = 1U;
++    texture.scalarType = image_io::EImageScalarType::UINT8;
++    texture.rowStrideBytes = 1U;
++    texture.storage = {128U};
++
++    for (const bool lommel : {false, true})
++    {
++        const SMaterialDescriptor::TModel model = lommel
++            ? SMaterialDescriptor::TModel(SLommelSeeligerParams{Vec3Type(0.5f)})
++            : SMaterialDescriptor::TModel(SLambertianParams{Vec3Type(0.5f)});
++        STransportFixture plain(SMaterialDescriptor{model, -1});
++        plain.params.renderSettings.radiometryMode = ERadiometryMode::FACTORIZED_SPECTRAL;
++        plain.install();
++        const auto reference = plain.renderer.render();
++
++        STransportFixture mapped(SMaterialDescriptor{model, 0}, &texture);
++        mapped.params.renderSettings.radiometryMode = ERadiometryMode::FACTORIZED_SPECTRAL;
++        mapped.install();
++        const auto textured = mapped.renderer.render();
++        REQUIRE(reference[0] > 0.0f);
++        CHECK(textured[0] == Catch::Approx(reference[0] * 128.0f / 255.0f).epsilon(5e-5));
++    }
++}
++
+ TEST_CASE("Typed material amplitude reaches RGB and physical output exactly once",
+           "[core][render][material][h2]")
+ {
