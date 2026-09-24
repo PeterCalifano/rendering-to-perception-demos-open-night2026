@@ -1,0 +1,7 @@
+/build/
+/deps/
+/output/
+*.onnx
+*.obj
+*.jpg
+*.mp4

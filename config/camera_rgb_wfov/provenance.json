@@ -1,0 +1,34 @@
+{
+  "camera": "futx_wfov",
+  "qualification": "provisional_response_model_not_hardware_calibration",
+  "sensor_source": "/media/peterc/SCRATCH_PRO/simulation_rendering_assets/assets/cameras/futx_wfov/sensor/ar0331/AR0331-D.PDF",
+  "sensor_sha256": "1048f14e495ee5feec1d3adf75e05af695ccc3a6a628411d84d0f7ca47c5199b",
+  "sensor_figure": "AR0331 datasheet page 38, Figure 43",
+  "presentation_source": "/media/peterc/SCRATCH/RENDERING_DATA/20250606-TYVAK_Payload_Cameras_Optical_Properties.pptx",
+  "presentation_sha256": "4294dd4b2e080d81cbf8e6b15d2d57f935acdba37349b9c076f1a8f9f9a5ae14",
+  "intrinsics_source": "VIS WFOV slide 4; GRBG and 12-bit metadata slide 11",
+  "optics_source": "VIS Coating slide 7, broad curve, ppt/media/image6.png",
+  "optics_interpretation": "spectral-cut filter, inferred from cutoff; user approved selection",
+  "excluded_optics_plot": "ppt/media/image7.png, near-unity curve; likely AR contribution, identity unconfirmed",
+  "unspecified_optical_losses": "unity assumption; second coating curve not multiplied",
+  "spectral_domain_nm": [
+    440,
+    1000
+  ],
+  "outside_domain": "unmodelled; truncation is not evidence of zero physical response",
+  "qe_extraction": "288-dpi source raster, colour-selected median ink row at every column",
+  "qe_axis_pdf_points": [
+    107.376,
+    522.595,
+    80.391,
+    383.187
+  ],
+  "qe_digitization_resolution": "about 0.48 nm/column and 0.00054 fraction/row; finite ink width adds uncertainty",
+  "qe_crossing_occlusion": "six green columns hidden by blue near 800 nm; linear interpolation across about 3.4 nm",
+  "optics_digitization_resolution": "1.28 nm/column and 0.00490 fraction/row; approx +/-2 pixels near cutoff",
+  "ir_leakage": "OD3 specification cannot be resolved by this raster; not qualified",
+  "collection_model": "ideal cosine fourth, small planar pupil; no calibrated lens or finite-pupil correction",
+  "psf_distortion_noise_saturation_adc": "not applied; full well and bit depth are metadata only",
+  "legacy_qe_csv": "not reused: duplicate red wavelengths; original source figure re-extracted",
+  "exposure_s": 0.001
+}
