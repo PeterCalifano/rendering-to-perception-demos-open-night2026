@@ -65,6 +65,7 @@ struct SOptions
     float orbit_step_deg{0.0f};
     double camera_azimuth_deg{0.0};
     double spin_multiplier{1.0};
+    std::optional<double> exposure_time_ms;
     bool headless{false};
 };
 
@@ -100,7 +101,8 @@ SOptions ParseOptions(int argc, char** argv)
                          "  [--max-features 1..100] [--max-new-features 1..25]\n"
                          "  [--spp N] [--max-frames N]\n"
                          "  [--camera-azimuth-deg N] [--orbit-step-deg N]\n"
-                         "  [--spin-multiplier N] [--headless] [--output-dir DIR]\n";
+                         "  [--spin-multiplier N] [--exposure-ms N]\n"
+                         "  [--headless] [--output-dir DIR]\n";
             std::exit(0);
         }
         if (key == "--headless")
@@ -139,6 +141,8 @@ SOptions ParseOptions(int argc, char** argv)
             options.camera_azimuth_deg = ParseFiniteNumber(value, key);
         else if (key == "--spin-multiplier")
             options.spin_multiplier = ParseFiniteNumber(value, key);
+        else if (key == "--exposure-ms")
+            options.exposure_time_ms = ParseFiniteNumber(value, key);
         else if (key == "--mode")
         {
             if (value == "klt")
@@ -168,6 +172,9 @@ SOptions ParseOptions(int argc, char** argv)
         throw std::invalid_argument("--camera-azimuth-deg must be within +/-180 degrees");
     if (options.spin_multiplier < 0.0 || options.spin_multiplier > 1.0e6)
         throw std::invalid_argument("--spin-multiplier must be within 0 and 1000000");
+    if (options.exposure_time_ms &&
+        (*options.exposure_time_ms <= 0.0 || *options.exposure_time_ms > 1000.0))
+        throw std::invalid_argument("--exposure-ms must be within (0, 1000] ms");
     if (options.mode != demo::EMode::Klt && options.centroid_model.empty())
         throw std::invalid_argument("Centroid and both modes require --centroid-model");
     if (options.mode == demo::EMode::Klt && !options.centroid_model.empty())
@@ -449,6 +456,9 @@ void Render(const SOptions& options, SCameraControl& control,
     using namespace spectra_rt;
     const auto cuda_device = QueryCudaDevice();
     auto sensor = CRendererConfigParser::ParseCamera(options.camera_yaml.string());
+    if (options.exposure_time_ms)
+        sensor.film.exposureTimeIn_s = static_cast<float>(*options.exposure_time_ms / 1000.0);
+    std::cout << "Camera exposure " << sensor.film.exposureTimeIn_s * 1000.0f << " ms\n";
     const cv::Size image_size_px(sensor.camera.intrinsics.frameWidth_px,
                                  sensor.camera.intrinsics.frameHeight_px);
     if (image_size_px != cv::Size(2048, 1536) ||
@@ -536,6 +546,7 @@ void Render(const SOptions& options, SCameraControl& control,
              << ",\"model\":" << demo::JsonQuote(options.model.string())
              << ",\"albedo_jpeg\":" << demo::JsonQuote(options.albedo_jpeg.string())
              << ",\"camera_yaml\":" << demo::JsonQuote(options.camera_yaml.string())
+             << ",\"exposure_time_s\":" << sensor.film.exposureTimeIn_s
              << ",\"klt_outlier_rejection\":" << demo::JsonQuote(klt_camera ? "msac" : "off");
     if (klt_camera)
         metadata << ",\"klt_camera_px\":{\"fx\":" << klt_camera->fx << ",\"fy\":" << klt_camera->fy

@@ -525,14 +525,15 @@ double CPreviewWindow::show(const cv::Mat& bgr)
     const float window_aspect = static_cast<float>(width_px) / std::max(1, height_px);
     const float half_width = window_aspect > image_aspect ? image_aspect / window_aspect : 1.0f;
     const float half_height = window_aspect > image_aspect ? 1.0f : window_aspect / image_aspect;
+    // Map OpenCV's first image row to the top of the OpenGL quad.
     glBegin(GL_QUADS);
-    glTexCoord2f(0, 1);
-    glVertex2f(-half_width, half_height);
-    glTexCoord2f(1, 1);
-    glVertex2f(half_width, half_height);
-    glTexCoord2f(1, 0);
-    glVertex2f(half_width, -half_height);
     glTexCoord2f(0, 0);
+    glVertex2f(-half_width, half_height);
+    glTexCoord2f(1, 0);
+    glVertex2f(half_width, half_height);
+    glTexCoord2f(1, 1);
+    glVertex2f(half_width, -half_height);
+    glTexCoord2f(0, 1);
     glVertex2f(-half_width, -half_height);
     glEnd();
     glfwSwapBuffers(window_);

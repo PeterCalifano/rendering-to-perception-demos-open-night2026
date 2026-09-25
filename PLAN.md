@@ -149,6 +149,30 @@ commits `8283207` (build script) and `1ec8a95` (stage logging). Both were pushed
 GitHub `main`; `git ls-remote` confirmed `1ec8a95`. Existing unrelated worktree
 documentation edits were excluded from both commits.
 
+### 12. Preview orientation (2026-09-25)
+
+- [x] Map the first OpenCV image row to the top of the shared OpenGL preview quad.
+- [x] Rebuild both portable demos, run the camera contract with the bundled library
+      path (1/1 passed), check C++ formatting, and inspect the diff.
+- [x] View a ten-frame camera folder fixture on the available display. A red
+      upper half appeared above a blue lower half in the captured preview;
+      sampled center pixels confirmed both positions.
+
+### 13. Live Bennu exposure (2026-09-25)
+
+- [x] Add a per-run exposure override and set the live Bennu launcher to 1.5 ms;
+      preserve the bundled 1 ms camera profile and record the effective exposure.
+- [x] Rebuild the portable renderer, check C++ formatting and shell syntax, and
+      complete a one-frame textured Bennu run with KLT and centroiding.
+- [x] Compare saved sphere frames at 1 and 1.5 ms: the same central crop's mean
+      grayscale value rose from 20.94 to 31.49; metadata records both durations.
+
+### 14. Moon frame replay (2026-09-25)
+
+- [x] Add a looping Moon-frame launcher with a finite headless pass option.
+- [x] Run one headless pass over the eight bundled frames; all eight centroid
+      results completed with no dropped frames.
+
 ## Review, commit, and comment rules
 
 After every large stage, inspect the full candidate diff and external worktree statuses; check threading, allocations, error paths, public Doxygen, physical-unit names, comments, and readability. Run relevant builds/tests, `clang-format`, and `git diff --check`. Stage explicit paths, inspect the full index, and run `git diff --cached --check` before committing. Opus 5.5 is not exposed here; use a focused guideline-based review.

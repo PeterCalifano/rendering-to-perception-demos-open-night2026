@@ -33,6 +33,11 @@ DEMO_BINARY_DIR=build/portable scripts/run_local_bundle.sh render --scene bennu 
 Use `scripts/run_local_bundle.sh camera` for webcam, video, and folder sources;
 pass the bundled centroid model and YOLO manifest paths shown in the
 [handoff](doc/developments/2026-09-25_portability_and_implementation_handoff.md#local-copy-bundle).
+To replay the extracted Moon-only frames continuously with centroiding, run
+`scripts/run_moon_frames_loop.sh`; press Ctrl-C to stop. The window restarts
+after each pass. Use `--frames-dir assets/moon_test_sky_4x3` for the sky crop,
+or `--loops 1` for one pass. Both frame sets live in ignored `assets/` and must
+be copied with the bundle.
 The launcher selects copied libraries ahead of the executables' absolute
 RUNPATH and sets the Bennu data root. It leaves CUDA device selection to the
 caller; set `CUDA_VISIBLE_DEVICES` when the host has multiple GPUs. Set
@@ -189,6 +194,8 @@ CUDA_VISIBLE_DEVICES=1 build/demo/render_stream_demo --scene bennu \
 ```
 
 The bundled [WFOV response](config/camera_rgb_wfov/provenance.json) is provisional: 2048 x 1536 GRBG, 12.85 mm, f/2.8, 1 ms, and 440–1000 nm. The renderer uses a finite-area 5778 K Sun at 1 AU, physical sensor measurement, four direct samples, stratified sampling, and `worldUnit_m=1000`. KLT and centroiding see one reconstructed grayscale frame. Its 8-bit value uses the fixed 6300-electron full-well reference throughout a run; it is not normalized per frame. Noise, ADC, saturation, distortion, and calibrated optics are not modeled.
+
+`scripts/run_bennu_live.sh` uses a 1.5 ms exposure for a slightly brighter live preview. Pass `--exposure-ms 1` to restore the bundled camera value or another positive value up to 1000 ms. The override changes expected sensor electrons before reconstruction and processing; `run.json` records the effective `exposure_time_s` when an output directory is set.
 
 ## Webcam, video, and image folders
 
