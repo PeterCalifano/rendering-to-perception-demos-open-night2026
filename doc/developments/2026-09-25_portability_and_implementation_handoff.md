@@ -103,6 +103,17 @@ For a demo-only rebuild after transfer, use the copied packages and the host
 CUDA toolkit. This does not rebuild Spectra-RT, KLT, or AutoForge:
 
 ```sh
+./build.sh
+DEMO_BINARY_DIR=build/portable scripts/run_local_bundle.sh render \
+  --scene sphere --spp 1 --max-frames 1 --headless
+```
+
+`build.sh --jobs N` sets build parallelism. `build.sh --tests` also configures
+and runs the Python-backed camera behavior test. The script checks that the
+copied build packages exist before configuring. The equivalent manual CMake
+commands are:
+
+```sh
 demo_root=$PWD
 cmake -S "$demo_root" -B "$demo_root/build/portable" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
