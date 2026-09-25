@@ -100,6 +100,15 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Review the September 25 scalar-texture and MSAC diffs, rebuild both demo variants, and leave all new edits unstaged at the original handoff.
 - [x] On later authorization, commit the MSAC source and documentation batches only in this demo repo. Leave the Spectra-RT source patch unstaged and make no push.
 
+### 7. Local copy bundle (2026-09-25)
+
+- [x] Inventory runtime library closure, installed CMake packages, Bennu assets, and both model sidecars.
+- [x] Copy installed native libraries and executables into ignored `external/`; copy Bennu and model payloads into ignored `assets/` with YOLO manifest-relative paths preserved.
+- [x] Add a launcher that resolves copied libraries before embedded absolute RUNPATH entries and sets the copied Bennu data root.
+- [x] Test relocated sphere+centroid and camera KLT+centroid+YOLO on physical GPU 1; confirm CPU centroid and CUDA YOLO providers.
+- [x] Test relocated textured Bennu, copied CMake package rebuild, checksum manifest, and loader path evidence; record exact results in the handoff.
+- [x] Review scripts, documentation, copied payload, host prerequisites, and final diff; commit only demo-repo paths under the existing demo-only authorization. Do not push.
+
 ## Review, commit, and comment rules
 
 After every large stage, inspect the full candidate diff and external worktree statuses; check threading, allocations, error paths, public Doxygen, physical-unit names, comments, and readability. Run relevant builds/tests, `clang-format`, and `git diff --check`. Stage explicit paths, inspect the full index, and run `git diff --cached --check` before committing. Opus 5.5 is not exposed here; use a focused guideline-based review.

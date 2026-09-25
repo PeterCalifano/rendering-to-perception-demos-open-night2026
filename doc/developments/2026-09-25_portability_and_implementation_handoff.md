@@ -1,29 +1,137 @@
 # Rendering-to-perception demo: portability and implementation handoff
 
-Snapshot: 2026-09-25. Demo repository: main at 0f57393. This report describes the
-working installation on Ubuntu 24.04 and the files needed to reproduce it elsewhere.
+Snapshot: 2026-09-25. Demo repository: main at 438b2f0 before the local bundle
+update. This report describes the working installation on Ubuntu 24.04 and the
+files needed to reproduce it elsewhere.
 Read [AGENTS.md](../../AGENTS.md), [PLAN.md](../../PLAN.md), and
-[README.md](../../README.md) before changing code. The demo repository alone is not a
-complete source or runtime bundle.
+[README.md](../../README.md) before changing code. The ignored `external/` and
+`assets/` directories are now the copied runtime bundle; a Git clone alone does
+not contain them.
+
+## Local copy bundle
+
+Run [package_local_bundle.sh](../../scripts/package_local_bundle.sh) once from
+this demo checkout after building `build/demo`. It copies the installed native
+libraries and executables into ignored `external/`, and Bennu plus the centroid
+and YOLO model inputs into ignored `assets/`. Its defaults name the source
+paths in the provenance section below. Override `NATIVE_PREFIX`, `SLAM_PREFIX`,
+`ORT_PREFIX`, `OPENCV_PREFIX`, `OPTIX_ROOT`, `CUDA_LIB_DIR`, `CUDNN_LIB_DIR`,
+`RENDERING_DATA`, `CENTROID_MODEL`, or `YOLO_ROOT` before running it if an
+installation moved. It refuses to mix a new bundle with existing directories;
+inspect or move an older bundle before packaging again.
+
+The folder contract is:
+
+```text
+external/bin/                built demo executables
+external/native/             Spectra-RT, KLT, AutoForge installed prefix
+external/slam-primitives/    installed headers and CMake package
+external/onnxruntime/       ONNX Runtime headers, CMake package, CPU/CUDA libraries
+external/opencv/            OpenCV 4.10 headers, CMake package, shared/3rdparty libraries
+external/optix/             OptiX 9 headers and license files for compilation
+external/cuda-runtime/lib/  CUDA 12.9 and cuDNN 9 user-space shared libraries
+external/BUNDLE.sha256      checksums for regular files in external/ and assets/
+assets/rendering/assets/bodies/bennu/shape/       Bennu OBJ
+assets/rendering/assets/bodies/bennu/appearance/albedo/  Bennu JPEG
+assets/models/centroid/     plain image-only centroid ONNX
+assets/models/yolo/examples/model_configs/  YOLO manifest
+assets/models/yolo/models/onnx/             YOLO weights
+```
+
+Copy the whole demo directory, including ignored `external/` and `assets/`:
+
+```sh
+rsync -a --exclude=.git --exclude=/build --exclude=/deps --exclude=/output \
+  /home/peterc/devDir/rendering-to-perception-demos-open-night2026/ \
+  /path/on/new-machine/rendering-to-perception-demos-open-night2026/
+cd /path/on/new-machine/rendering-to-perception-demos-open-night2026
+CUDA_VISIBLE_DEVICES=1 scripts/run_local_bundle.sh render \
+  --scene sphere --mode both \
+  --centroid-model "$PWD/assets/models/centroid/best_model_plain_traveling-goat-68_22b61bbd4ddd.onnx" \
+  --spp 1 --max-frames 1 --headless
+```
+
+The launcher changes to the demo root so the tracked camera YAML resolves,
+sets `RENDERING_DATA` to the copied Bennu root, and puts bundled shared
+libraries ahead of the binaries' original absolute RUNPATH entries. It defaults
+`CUDA_VISIBLE_DEVICES` to 1. Use `scripts/run_local_bundle.sh camera` with the
+same camera options as the ordinary executable. For a video with all three
+processors:
+
+```sh
+scripts/run_local_bundle.sh camera --video /path/to/video.mp4 --mode both \
+  --centroid-model "$PWD/assets/models/centroid/best_model_plain_traveling-goat-68_22b61bbd4ddd.onnx" \
+  --yolo-model "$PWD/assets/models/yolo/examples/model_configs/yolov7_640x640.ptafmodel" \
+  --max-frames 1 --headless
+```
+
+Replace `--video` with `--frames-dir /path/to/frames` for a folder, or use
+`--camera-index 0` for a webcam. The latter needs a device on the destination.
+The copied YOLO manifest still resolves `../../models/onnx/yolov7_640x640.onnx`.
+Verify the copied payload from the demo root with
+`sha256sum -c external/BUNDLE.sha256` before use; the manifest omits symlinks,
+whose targets remain relative inside each copied install.
+For textured Bennu, add:
+
+```sh
+--albedo-jpeg "$PWD/assets/rendering/assets/bodies/bennu/appearance/albedo/Bennu_OSIRIS-REx_5cm_v1.jpg"
+```
+
+This runtime copy needs a compatible Ubuntu 24.04 x86-64 host with an NVIDIA
+driver and physical GPU 1 matching the current 4070 Ti guard.
+The OS loader, glibc, libstdc++, X11/GLFW/OpenGL, codecs, and the NVIDIA driver
+remain host components. Headless use does not require a display. For a new GPU
+layout, update the guard and `physical_gpu_index` as described below, rebuild,
+and repackage; setting a different `CUDA_VISIBLE_DEVICES` value alone cannot
+pass the present guard. The copied prefixes can be used to rebuild the demo,
+but that still requires a C++20 compiler, CMake, Eigen 3.4, CUDA toolkit 12.9,
+OptiX headers, and the host development packages. The bundle does not contain
+the KLT/SLAM source worktrees required to rebuild those libraries from source.
+
+To configure against the copied installed packages, set `CMAKE_PREFIX_PATH` to
+`external/native;external/slam-primitives;external/onnxruntime`,
+`OpenCV_DIR=external/opencv/lib/cmake/opencv4`, and
+`OPTIX_ROOT=external/optix`. Use absolute paths for these CMake values. A
+separate `external/onnxruntime` retains its installed CMake package and CUDA
+provider, while its unneeded `onnx_test_runner` binary is omitted. `external/`
+and `assets/` are ignored by Git and must be included explicitly when copying.
+
+For a demo-only rebuild after transfer, use the copied packages and the host
+CUDA toolkit. This does not rebuild Spectra-RT, KLT, or AutoForge:
+
+```sh
+demo_root=$PWD
+cmake -S "$demo_root" -B "$demo_root/build/portable" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH="$demo_root/external/native;$demo_root/external/slam-primitives;$demo_root/external/onnxruntime" \
+  -DOpenCV_DIR="$demo_root/external/opencv/lib/cmake/opencv4" \
+  -DOPTIX_ROOT="$demo_root/external/optix" \
+  -DDEMO_ENABLE_ML=ON -DDEMO_BUILD_TESTS=OFF
+cmake --build "$demo_root/build/portable" -j 8
+```
 
 ## Copy checklist
 
-- [ ] Copy this demo repository, including config/camera_rgb_wfov and
-      patches/0001-admit-scalar-albedo-in-factorized-transport.patch.
-- [ ] Copy or recreate the matching Spectra-RT checkout. For a clean checkout use
+- [ ] Copy this demo repository with ignored `external/` and `assets/`, plus
+      tracked config/camera_rgb_wfov and the Spectra-RT patch. Verify
+      `external/BUNDLE.sha256` after transfer.
+- [ ] On the destination, run the bundled sphere+centroid smoke, then a camera
+      video/folder smoke, then textured Bennu and YOLO as needed.
+- [ ] For a dependency source rebuild, copy or recreate the matching
+      Spectra-RT checkout. For a clean checkout use
       branch feature/implement-factorized-radiometry-mode at f948bd6 and apply the
       patch in this repository once. Do not carry unrelated Spectra-RT edits into
       that patch.
-- [ ] Copy the exact working trees of pyramidal-klt-for-space-nav and
+- [ ] For a dependency source rebuild, copy the exact working trees of
+      pyramidal-klt-for-space-nav and
       slam-primitives, including uncommitted and untracked source files. Their
       current clean Git revisions alone do not describe the compiled API.
-- [ ] Install a matching C++/CUDA/OptiX/OpenCV toolchain and build the native
-      dependencies in the order below.
-- [ ] For Bennu, copy the OBJ. Copy the JPEG as well for textured Bennu. The
-      built-in sphere needs neither file.
-- [ ] For centroiding or YOLO, copy the appropriate model files, AutoForge
-      source/package, and ONNX Runtime installation. A KLT-only build can omit
-      these ML components.
+- [ ] For a rebuild, install a matching C++/CUDA toolchain and build the native
+      dependencies in the order below. The copied package prefixes cover
+      OpenCV, OptiX headers, Spectra-RT, KLT, AutoForge, and ONNX Runtime.
+- [ ] For Bennu, include the bundled OBJ and, for texture, JPEG. The built-in
+      sphere needs neither file.
+- [ ] For centroiding or YOLO, include the bundled model files and ML libraries.
 - [ ] For live preview, provide an X11/OpenGL display. A display is not needed
       for a headless run, although GLFW and OpenGL are still link dependencies.
 - [ ] For webcam input, provide a camera device and a working OpenCV video
@@ -35,11 +143,11 @@ complete source or runtime bundle.
 
 | Component | Source used here | Transfer rule |
 | --- | --- | --- |
-| Demo | main, 0f57393 | Copy or clone this repository. Its build/, deps/, and MP4 output are ignored. |
-| Spectra-RT | feature/implement-factorized-radiometry-mode, f948bd6 | Clone this revision and apply the tracked patch for grayscale textured transport. Current local source has additional unrelated unstaged edits; do not treat its whole dirty diff as the demo patch. |
-| KLT | feature/space-tailored-extraction, c714e1f | Copy the working tree with its 28 modified paths or commit/export those changes separately first. It supplies the compiled frontend used here. |
-| SLAM primitives | feature/extend-visual-features-support, 5e54f81 | Copy the working tree with its 42 status entries, including untracked strong-ID and camera-type headers, or commit/export them separately first. |
-| AutoForge deploy | develop, 03bb25c | Needed only for centroid/YOLO builds. Its current local edit is documentation only; source at this revision was used. |
+| Demo | main, 438b2f0 before bundle work | Copy the complete working folder, including ignored external/ and assets/. Git alone does not carry the payload. |
+| Spectra-RT | feature/implement-factorized-radiometry-mode, f948bd6 | The runtime bundle contains its install. For a source rebuild, clone this revision and apply the tracked patch. Keep unrelated local edits separate. |
+| KLT | feature/space-tailored-extraction, c714e1f | The runtime bundle contains its install. For a source rebuild, copy the working tree with its 28 modified paths or export those changes separately. |
+| SLAM primitives | feature/extend-visual-features-support, 5e54f81 | The runtime bundle contains its install. For a source rebuild, copy the working tree with its 42 status entries, including untracked strong-ID and camera-type headers. |
+| AutoForge deploy | develop, 03bb25c | The runtime bundle contains its install. Source is needed only when rebuilding that library; the current local edit is documentation only. |
 | ONNX Runtime | installed 1.23.0 | Needed for ML builds. This machine has CPU and CUDA providers in a separate installation. |
 | OptiX SDK | header OPTIX_VERSION 90000 | Needed to build Spectra-RT. This machine used a separate OptiX 9 SDK checkout. |
 
@@ -79,9 +187,9 @@ of this demo build.
 
 ### External data and models
 
-These paths are from the original machine. Place the files elsewhere on the new
-machine and pass the new paths through the commands below. Sizes and hashes
-identify the exact inputs used here.
+These paths identify the original inputs copied into `assets/`. Use the
+`assets/` paths in the local-bundle commands above after transfer. Sizes and
+hashes identify the exact inputs used here.
 
 | Input | Required for | Bytes | SHA-256 |
 | --- | --- | ---: | --- |
@@ -122,14 +230,14 @@ frames.jsonl, and 50 annotated PNGs. Both paths are ignored by Git.
 | Video encoding | FFmpeg 6.1.1 | Optional; converts saved PNGs to MP4. |
 | ML runtime | ONNX Runtime 1.23.0 | Required only with DEMO_ENABLE_ML=ON. CUDA inference also needs its CUDA provider, CUDA libraries, and cuDNN 9. |
 
-The current ML-enabled executable has RUNPATH entries that include absolute
-paths to the original demo prefix, OpenCV, ONNX Runtime, and CUDA installations.
-Copying build/ or deps/ binaries alone is not a portable installation. Rebuild
-in the destination paths, or explicitly audit and repair every runtime library
-path and ABI before using copied binaries. The ONNX Runtime installation here
-occupies about 3.3 GiB; the OptiX SDK checkout is about 178 MiB. The Bennu OBJ
-is nearly 2 GiB on disk and takes additional memory while loading. No minimum
-host RAM measurement was made.
+The original ML-enabled executable has RUNPATH entries for absolute paths on
+this machine. `run_local_bundle.sh` supplies `LD_LIBRARY_PATH` ahead of those
+entries, so copied binaries resolve the bundled libraries first. Directly
+executing `external/bin/*` without the launcher can fall back to unavailable
+original paths. The copied ONNX Runtime headers and libraries occupy about
+2.5 GiB; its 781 MiB test runner is omitted. The Bennu OBJ is nearly 2 GiB on
+disk and takes additional memory while loading. No minimum host RAM measurement
+was made.
 
 ## Rebuild on a matching machine
 
@@ -374,6 +482,23 @@ of parsing the overlay text.
   benchmark products.
 
 ## Verification and evidence available here
+
+- The ignored bundle measures 4.9 GiB under `external/` and 2.1 GiB under
+  `assets/`. `external/BUNDLE.sha256` covers 963 regular files. The five
+  source asset/model hashes above match the copied files.
+- A second-path copy under `/tmp/perception-bundle.cMwDEk` ran sphere KLT and
+  centroiding (150 active IDs, centroid OK), camera video KLT, centroiding,
+  and YOLO together (CPU centroid, CUDA YOLO, 150 active IDs), and textured
+  Bennu KLT and centroiding (150 active IDs, centroid OK). All three used
+  physical GPU 1. This was path relocation on the same host, not a test on a
+  second machine.
+- CMake configured and rebuilt both demos from the second path against the
+  copied installed packages. Its first configure exposed a missing OpenCV
+  `lib/opencv4/3rdparty` directory; the packager now includes it. With the
+  launcher library path, `ldd` resolves Spectra-RT, KLT, AutoForge, ONNX
+  Runtime, OpenCV, CUDA runtime, cuBLAS, cuFFT, and cuDNN under that second
+  path. The NVIDIA driver, GLFW, OpenGL, and system codecs resolve from the
+  host.
 
 - The ML and no-ML demo variants built with GCC 13.3; camera_stream_contract
   passed with Python 3.12, OpenCV Python, and NumPy.

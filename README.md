@@ -4,6 +4,33 @@ Two C++20 programs use the same frame processor. `render_stream_demo` renders a 
 
 For another machine, use the [copy checklist and implementation handoff](doc/developments/2026-09-25_portability_and_implementation_handoff.md). It records external source snapshots, asset and model hashes, rebuild order, GPU assumptions, and the code ownership map.
 
+## Copyable local runtime
+
+Run `scripts/package_local_bundle.sh` after the ML-enabled build below. It creates
+ignored `external/` with the executables and installed native, OpenCV, ONNX,
+CUDA user-space, and OptiX files, plus ignored `assets/` with Bennu and both
+models. Copy the entire folder, including those ignored directories; cloning
+Git alone does not copy them. On a matching Ubuntu x86-64 host with a compatible
+NVIDIA driver and physical GPU 1 as the RTX 4070 Ti, run:
+
+```sh
+sha256sum -c external/BUNDLE.sha256
+scripts/run_local_bundle.sh render --scene sphere --spp 1 \
+  --max-frames 1 --headless
+scripts/run_local_bundle.sh render --scene bennu --mode both \
+  --centroid-model "$PWD/assets/models/centroid/best_model_plain_traveling-goat-68_22b61bbd4ddd.onnx" \
+  --albedo-jpeg "$PWD/assets/rendering/assets/bodies/bennu/appearance/albedo/Bennu_OSIRIS-REx_5cm_v1.jpg" \
+  --spp 1 --max-frames 1 --headless
+```
+
+Use `scripts/run_local_bundle.sh camera` for webcam, video, and folder sources;
+pass the bundled centroid model and YOLO manifest paths shown in the
+[handoff](doc/developments/2026-09-25_portability_and_implementation_handoff.md#local-copy-bundle).
+The launcher selects copied libraries ahead of the executables' absolute
+RUNPATH and sets the Bennu data root. The host still supplies its driver,
+glibc, display stack, and codecs. A different GPU layout needs the guard and
+run metadata updated, followed by a rebuild and repackage.
+
 This repo retains only the MIT license from `cpp_cuda_template_project` commit `f207d2a`; it contains no ROS overlay, wrapper, CUDA placeholder, or template-conformance suite.
 
 ## Build
