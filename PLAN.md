@@ -130,13 +130,13 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Add a root `build.sh` that configures and builds both ML-enabled programs from the copied `external/` packages, without rebuilding external repositories.
 - [x] Document host prerequisites, the script's options, and how to launch its binaries through the bundled library path.
 - [x] Run shell checks, a real configure/build, optional behavior test, and a bounded runtime smoke; review the complete staged diff.
-- [ ] Commit the demo-only build workflow and push it under the user's explicit request; verify the published head.
+- [x] Commit the demo-only build workflow and push it under the user's explicit request; verify the published head.
 
 ### 11. Live stage logging (2026-09-25)
 
 - [x] Log completed frame status and labeled stage times in both programs through the KLT logger facility, reusing the existing summary measurements.
 - [x] Document the terminal log level and timing boundaries; verify a rendered and a camera frame, then review the source diff for readability.
-- [ ] Commit the logging capability separately from the build script and push both commits under the user's explicit request.
+- [x] Commit the logging capability separately from the build script and push both commits under the user's explicit request.
 
 `./build.sh --tests --jobs 8` configured and built both binaries from `external/` and passed
 `camera_stream_contract` (1/1). `bash -n`, `shellcheck`, argument rejection, and the
@@ -144,6 +144,10 @@ C++ `clang-format` check passed. On GPU 1, a one-frame sphere run logged render,
 readback, reconstruction, KLT, and centroid stages; a one-frame folder run logged
 capture, KLT, centroid, and YOLO stages. `DEMO_LOG_LEVEL=quiet` suppressed the
 demo frame lines. The copied libraries and assets stayed in ignored directories.
+The two reviewed staged batches passed `git diff --cached --check` and became signed
+commits `8283207` (build script) and `1ec8a95` (stage logging). Both were pushed to
+GitHub `main`; `git ls-remote` confirmed `1ec8a95`. Existing unrelated worktree
+documentation edits were excluded from both commits.
 
 ## Review, commit, and comment rules
 
