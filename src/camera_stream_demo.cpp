@@ -315,9 +315,7 @@ int main(int argc, char** argv)
                         }
                         auto preview = processor->process(*frame, processed_index++,
                                                           incoming.dropped() + outgoing.dropped());
-                        std::cout << preview.summary.line() << " | mask "
-                                  << preview.summary.mask_status << " | dropped "
-                                  << preview.summary.dropped_frames << '\n';
+                        demo::LogFrameSummary(preview.summary);
                         writer.write(preview);
                         outgoing.publish(std::move(preview));
                     }

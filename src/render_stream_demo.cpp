@@ -599,9 +599,7 @@ void Render(const SOptions& options, SCameraControl& control,
                                           readback_ms, reconstruction_ms, scene_update_ms,
                                           phase_angle_deg, body_spin_phase_deg},
                                          index, outgoing.dropped());
-        std::cout << preview.summary.line() << " | mask " << preview.summary.mask_status
-                  << " | IAS " << scene_update_ms << " ms | source " << source_ms
-                  << " ms | perception " << preview.summary.processing_ms << " ms\n";
+        demo::LogFrameSummary(preview.summary);
         writer.write(preview);
         outgoing.publish(std::move(preview));
     }

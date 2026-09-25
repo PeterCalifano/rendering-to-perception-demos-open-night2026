@@ -413,7 +413,7 @@ step, not an online frame-rate measurement.
 | [CMakeLists.txt](../../CMakeLists.txt) | Always link Spectra-RT, KLT, OpenCV, GLFW, and OpenGL. Gate AutoForge/ONNX code with DEMO_ENABLE_ML; gate the Python behavior test with DEMO_BUILD_TESTS. |
 | [render_stream_demo.cpp](../../src/render_stream_demo.cpp) | Parse render options, create sphere/Bennu and fixed Sun, configure factorized physical sensor, update camera/body, read Bayer electrons, reconstruct fixed-scale grayscale, pass the calibrated frame to the shared processor. Query the selected CUDA device and write run metadata. |
 | [camera_stream_demo.cpp](../../src/camera_stream_demo.cpp) | Capture webcam/video/folder frames, pace files, retain source indices, drain at EOF, use one-slot capture and preview mailboxes, and pass unknown calibration explicitly. |
-| [demo_core.h](../../src/demo_core.h) and [demo_core.cpp](../../src/demo_core.cpp) | Own the frontend KLT pipeline, optional model adapter, eight-position display trails, per-frame summary, JSONL/PNG writer, and GLFW preview. This is the shared frame ownership boundary. |
+| [demo_core.h](../../src/demo_core.h) and [demo_core.cpp](../../src/demo_core.cpp) | Own the frontend KLT pipeline, optional model adapter, eight-position display trails, per-frame summary and stage logger, JSONL/PNG writer, and GLFW preview. This is the shared frame ownership boundary. |
 | [model_adapter.cpp](../../src/model_adapter.cpp) | Bind centroid ONNX to CPU and YOLO manifest to its declared backend; normalize inputs, decode the 1x2 centroid, decode YOLO raw rows, apply score filtering and class-aware NMS. |
 | [stream_contract.py](../../tests/stream_contract.py) | Generate disposable folder frames and assert ordering, IDs, mask recovery, dimension rejection, and MSAC OFF for uncalibrated media. |
 | [camera.yaml](../../config/camera_rgb_wfov/camera.yaml) and [provenance.json](../../config/camera_rgb_wfov/provenance.json) | Keep the provisional WFOV sensor response and its source limitations in this repository. |
@@ -467,6 +467,15 @@ frames.jsonl row carries source_index and
 processed_index, active_track_ids, KLT/mask/MSAC and centroid states, stage
 times, and optional phase/spin values. Read these structured fields instead
 of parsing the overlay text.
+
+Both programs pass each completed `SFrameSummary` to the KLT `CLogger` at
+Info level. The terminal prints one status line and one labeled timing line
+per processed frame. Rendered frames report scene update, render, readback,
+reconstruction, KLT, and centroiding; camera frames report capture, KLT,
+centroiding, and YOLO when enabled. `source_ms` and `processing_ms` are
+aggregate intervals that overlap their component stages. Set
+`DEMO_LOG_LEVEL=quiet` to suppress only these demo frame lines. The saved
+JSONL values remain authoritative for machine analysis.
 
 ## Physical and geometric invariants
 

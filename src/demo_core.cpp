@@ -7,6 +7,8 @@
 #include "model_adapter.h"
 #endif
 
+#include <pyramidal_klt/utils/logging/CLogger.h>
+
 #include <GLFW/glfw3.h>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -150,6 +152,42 @@ std::string SFrameSummary::line() const
     if (body_spin_phase_deg)
         out << "  spin " << std::setprecision(1) << *body_spin_phase_deg << " deg";
     return out.str();
+}
+
+std::string SFrameSummary::timingLine() const
+{
+    std::ostringstream out;
+    out << "frame " << processed_index << " stages [ms]: " << std::fixed << std::setprecision(1);
+    if (phase_angle_deg)
+    {
+        out << "scene update " << scene_update_ms << " | render " << render_ms << " | readback "
+            << readback_ms << " | reconstruct " << reconstruction_ms << " | source " << source_ms;
+    }
+    else
+    {
+        out << "capture " << source_ms;
+    }
+    if (klt_enabled)
+        out << " | KLT " << klt_ms;
+    if (centroid_status != "OFF")
+        out << " | centroid " << centroid_ms;
+    if (yolo_enabled)
+        out << " | YOLO " << yolo_ms;
+    out << " | processing " << processing_ms;
+    return out.str();
+}
+
+void LogFrameSummary(const SFrameSummary& summary)
+{
+    using pyramidal_klt::logging::CLogger;
+    using pyramidal_klt::logging::ELogLevel;
+    static CLogger logger("perception-demo", ELogLevel::Info);
+    static const bool configured = logger.setLevelFromEnvironment("DEMO_LOG_LEVEL");
+    (void)configured;
+
+    logger.info(summary.line(), " | mask ", summary.mask_status, " | dropped ",
+                summary.dropped_frames);
+    logger.info(summary.timingLine());
 }
 
 std::string SFrameSummary::json() const

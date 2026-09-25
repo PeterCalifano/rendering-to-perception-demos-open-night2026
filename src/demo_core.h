@@ -93,9 +93,14 @@ struct SFrameSummary
 
     /** Format one compact diagnostics line for terminal and preview. */
     [[nodiscard]] std::string line() const;
+    /** Format measured frame stages in milliseconds for terminal logging. */
+    [[nodiscard]] std::string timingLine() const;
     /** Format the same record as a standalone JSON object. */
     [[nodiscard]] std::string json() const;
 };
+
+/** Log frame status and measured stages through the KLT logger facility. */
+void LogFrameSummary(const SFrameSummary& summary);
 
 /** Fully processed frame; the image already contains its colored overlay. */
 struct SPreviewFrame
