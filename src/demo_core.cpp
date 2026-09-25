@@ -228,6 +228,7 @@ std::string SFrameSummary::json() const
 }
 
 CFrameProcessor::CFrameProcessor(cv::Size image_size_px, EMode mode, EKltExtraction extraction,
+                                 std::uint32_t max_features, std::uint32_t max_new_features,
                                  std::optional<pyramid_klt::SCameraIntrinsics> camera_intrinsics,
                                  const std::filesystem::path& centroid_model,
                                  const std::filesystem::path& yolo_model)
@@ -237,11 +238,15 @@ CFrameProcessor::CFrameProcessor(cv::Size image_size_px, EMode mode, EKltExtract
     {
         throw std::invalid_argument("Processor image size must be positive");
     }
+    ValidateKltFeatureLimits(max_features, max_new_features);
     if (mode_ != EMode::Centroid)
     {
         pyramid_klt::SKltPipelineSettings settings;
         settings.camera.image_width = static_cast<std::uint32_t>(image_size_px.width);
         settings.camera.image_height = static_cast<std::uint32_t>(image_size_px.height);
+        settings.tracker_settings.max_num_features = max_features;
+        settings.tracker_settings.max_num_feats_extraction = max_new_features;
+        settings.detector.max_new_features = max_new_features;
         if (camera_intrinsics)
         {
             if (camera_intrinsics->image_width != settings.camera.image_width ||
@@ -541,6 +546,18 @@ std::uint32_t ParsePositiveCount(const std::string& value, const char* option)
     if (parsed.ec != std::errc{} || parsed.ptr != value.data() + value.size() || count == 0)
         throw std::invalid_argument(std::string(option) + " requires a positive integer");
     return count;
+}
+
+void ValidateKltFeatureLimits(std::uint32_t max_features, std::uint32_t max_new_features)
+{
+    if (max_features == 0 || max_features > default_max_features)
+        throw std::invalid_argument("--max-features must be between 1 and " +
+                                    std::to_string(default_max_features));
+    if (max_new_features == 0 || max_new_features > default_max_new_features)
+        throw std::invalid_argument("--max-new-features must be between 1 and " +
+                                    std::to_string(default_max_new_features));
+    if (max_new_features > max_features)
+        throw std::invalid_argument("--max-new-features must not exceed --max-features");
 }
 
 std::string JsonQuote(std::string_view value)

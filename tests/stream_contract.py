@@ -33,11 +33,12 @@ def make_frame(path: Path, index: int, *, dark: bool = False, width_px: int = 64
         raise RuntimeError(f"Could not write fixture: {path}")
 
 
-def run_stream(executable: Path, input_dir: Path, output_dir: Path, count: int) -> subprocess.CompletedProcess[str]:
+def run_stream(executable: Path, input_dir: Path, output_dir: Path, count: int,
+               *extra_args: str) -> subprocess.CompletedProcess[str]:
     """Run a finite folder stream through the public CLI."""
     return subprocess.run(
         [str(executable), "--frames-dir", str(input_dir), "--fps", "4", "--max-frames",
-         str(count), "--headless", "--output-dir", str(output_dir)],
+         str(count), "--headless", "--output-dir", str(output_dir), *extra_args],
         capture_output=True, text=True, timeout=30, check=False,
     )
 
@@ -57,8 +58,12 @@ def main(executable: Path) -> None:
                                       "frame11.png", "frame12.png")):
             make_frame(input_dir / name, index)
         output_dir = root / "tracked"
-        result = run_stream(executable, input_dir, output_dir, 5)
+        result = run_stream(executable, input_dir, output_dir, 5,
+                            "--max-features", "40", "--max-new-features", "10")
         assert result.returncode == 0, result.stdout + result.stderr
+        metadata = json.loads((output_dir / "run.json").read_text())
+        assert metadata["klt_max_features"] == 40
+        assert metadata["klt_max_new_features"] == 10
         records = read_records(output_dir)
         assert len(records) == 5, records
         assert [item["source_index"] for item in records] == list(range(5))
@@ -66,6 +71,8 @@ def main(executable: Path) -> None:
         assert all(item["msac_status"] == "OFF" and item["msac_outliers"] == 0
                    for item in records)
         assert any(item["active_features"] > 0 for item in records)
+        assert all(item["active_features"] <= 40 and item["new_features"] <= 10
+                   for item in records)
         assert any(set(current["active_track_ids"]) & set(previous["active_track_ids"])
                    for previous, current in zip(records, records[1:]))
         for index in range(5):
@@ -85,6 +92,14 @@ def main(executable: Path) -> None:
         assert retry[1]["mask_status"] == "EMPTY" and retry[1]["extraction_retry"]
         assert any(item["mask_status"] == "READY" and item["active_features"] > 0
                    for item in retry[2:])
+
+        for option, value in (("--max-features", "101"),
+                              ("--max-new-features", "26"),
+                              ("--max-features", "10")):
+            result = run_stream(executable, input_dir, root / "invalid", 1,
+                                option, value)
+            assert result.returncode != 0
+            assert option in result.stderr or value in result.stderr
 
         mismatch_dir = root / "mismatch"
         mismatch_dir.mkdir()

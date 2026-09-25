@@ -58,6 +58,8 @@ struct SOptions
     std::string scene{"sphere"};
     std::string view{"whole_body"};
     demo::EMode mode{demo::EMode::Klt};
+    std::uint32_t max_features{demo::default_max_features};
+    std::uint32_t max_new_features{demo::default_max_new_features};
     std::uint32_t spp{8};
     std::uint32_t max_frames{0};
     float orbit_step_deg{0.0f};
@@ -95,6 +97,7 @@ SOptions ParseOptions(int argc, char** argv)
                          "  [--albedo-jpeg FILE] (Bennu; requires scalar-texture Spectra-RT)\n"
                          "  [--view whole_body|approach|surface] [--camera-yaml FILE]\n"
                          "  [--mode klt|centroid|both] [--centroid-model ONNX]\n"
+                         "  [--max-features 1..100] [--max-new-features 1..25]\n"
                          "  [--spp N] [--max-frames N]\n"
                          "  [--camera-azimuth-deg N] [--orbit-step-deg N]\n"
                          "  [--spin-multiplier N] [--headless] [--output-dir DIR]\n";
@@ -122,6 +125,10 @@ SOptions ParseOptions(int argc, char** argv)
             options.scene = value;
         else if (key == "--view")
             options.view = value;
+        else if (key == "--max-features")
+            options.max_features = demo::ParsePositiveCount(value, key.c_str());
+        else if (key == "--max-new-features")
+            options.max_new_features = demo::ParsePositiveCount(value, key.c_str());
         else if (key == "--spp")
             options.spp = demo::ParsePositiveCount(value, key.c_str());
         else if (key == "--max-frames")
@@ -152,6 +159,7 @@ SOptions ParseOptions(int argc, char** argv)
         throw std::invalid_argument("--albedo-jpeg requires --scene bennu");
     if (options.view != "whole_body" && options.view != "approach" && options.view != "surface")
         throw std::invalid_argument("Unknown view preset");
+    demo::ValidateKltFeatureLimits(options.max_features, options.max_new_features);
     if (options.headless && options.max_frames == 0)
         throw std::invalid_argument("Headless rendering requires --max-frames");
     if (!std::isfinite(options.orbit_step_deg) || std::abs(options.orbit_step_deg) > 5.0f)
@@ -497,7 +505,8 @@ void Render(const SOptions& options, SCameraControl& control,
     std::vector<float> grayscale_electrons(pixels);
     cv::Mat processing_gray(image_size_px, CV_8UC1);
     demo::CFrameProcessor processor(image_size_px, options.mode, demo::EKltExtraction::Space,
-                                    klt_camera, options.centroid_model);
+                                    options.max_features, options.max_new_features, klt_camera,
+                                    options.centroid_model);
     demo::CFrameWriter writer(options.output_dir);
     const bool body_spins = options.scene == "bennu" && options.spin_multiplier > 0.0;
     const std::vector<SSceneInstanceConfig> body_instances{MakeBodyInstance(options)};
@@ -505,6 +514,8 @@ void Render(const SOptions& options, SCameraControl& control,
     std::ostringstream metadata;
     metadata << std::setprecision(10) << "{\"schema\":2,\"program\":\"render_stream_demo\""
              << ",\"mode\":" << demo::JsonQuote(demo::ModeName(options.mode))
+             << ",\"klt_max_features\":" << options.max_features
+             << ",\"klt_max_new_features\":" << options.max_new_features
              << ",\"scene\":" << demo::JsonQuote(options.scene)
              << ",\"view\":" << demo::JsonQuote(options.view)
              << ",\"camera_azimuth_deg\":" << options.camera_azimuth_deg

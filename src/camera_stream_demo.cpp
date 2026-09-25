@@ -37,6 +37,8 @@ struct SOptions
     std::filesystem::path output_dir;
     demo::EMode mode{demo::EMode::Klt};
     demo::EKltExtraction extraction{demo::EKltExtraction::Space};
+    std::uint32_t max_features{demo::default_max_features};
+    std::uint32_t max_new_features{demo::default_max_new_features};
     std::uint32_t max_frames{0};
     double fps{15.0};
     bool headless{false};
@@ -52,6 +54,7 @@ SOptions ParseOptions(int argc, char** argv)
         {
             std::cout << "camera_stream_demo --camera-index N | --video FILE | --frames-dir DIR\n"
                          "  [--mode klt|centroid|both] [--klt-extraction space|generic]\n"
+                         "  [--max-features 1..100] [--max-new-features 1..25]\n"
                          "  [--centroid-model ONNX] [--yolo-model PTAFMODEL]\n"
                          "  [--fps N] [--max-frames N] [--headless] [--output-dir DIR]\n";
             std::exit(0);
@@ -76,6 +79,10 @@ SOptions ParseOptions(int argc, char** argv)
             options.yolo_model = value;
         else if (key == "--output-dir")
             options.output_dir = value;
+        else if (key == "--max-features")
+            options.max_features = demo::ParsePositiveCount(value, key.c_str());
+        else if (key == "--max-new-features")
+            options.max_new_features = demo::ParsePositiveCount(value, key.c_str());
         else if (key == "--max-frames")
             options.max_frames = demo::ParsePositiveCount(value, key.c_str());
         else if (key == "--fps")
@@ -108,6 +115,7 @@ SOptions ParseOptions(int argc, char** argv)
                              static_cast<int>(!options.frames_dir.empty());
     if (source_count != 1)
         throw std::invalid_argument("Select exactly one camera source");
+    demo::ValidateKltFeatureLimits(options.max_features, options.max_new_features);
     if (!(options.fps > 0.0) || !std::isfinite(options.fps))
         throw std::invalid_argument("--fps must be positive and finite");
     if (options.mode != demo::EMode::Klt && options.centroid_model.empty())
@@ -288,6 +296,7 @@ int main(int argc, char** argv)
                         if (!processor)
                         {
                             processor.emplace(frame->image.size(), options.mode, options.extraction,
+                                              options.max_features, options.max_new_features,
                                               std::nullopt, options.centroid_model,
                                               options.yolo_model);
                             const std::string source_kind = options.camera_index    ? "webcam"
@@ -301,6 +310,8 @@ int main(int argc, char** argv)
                             metadata
                                 << "{\"schema\":1,\"program\":\"camera_stream_demo\""
                                 << ",\"mode\":" << demo::JsonQuote(demo::ModeName(options.mode))
+                                << ",\"klt_max_features\":" << options.max_features
+                                << ",\"klt_max_new_features\":" << options.max_new_features
                                 << ",\"klt_extraction\":"
                                 << demo::JsonQuote(demo::ExtractionName(options.extraction))
                                 << ",\"source_kind\":" << demo::JsonQuote(source_kind)

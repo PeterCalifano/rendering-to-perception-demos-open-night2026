@@ -206,6 +206,8 @@ CUDA_VISIBLE_DEVICES=1 build/demo/camera_stream_demo --video /path/to/clip.avi \
   --yolo-model /home/peterc/devDir/ML-repos/torchAutoForge-deploy/examples/model_configs/yolov7_640x640.ptafmodel
 ```
 
+Both demos default to at most 100 active KLT tracks and 25 new features per extraction. Use `--max-features N` and `--max-new-features N` to choose lower limits; the latter must not exceed the former. The launcher scripts pass additional arguments through to the demos.
+
 KLT uses illuminated-body masking and Kmeans coverage by default. Space-aware extraction needs a resolved, lit body with enough image contrast; a dark or tiny target can yield `EMPTY` and zero new points until later frames. For ordinary footage, pass `--klt-extraction generic` to disable the illuminated-body mask. Centroiding runs on CPU. The current YOLOv7 manifest reports CUDA then CPU providers under `CUDA_VISIBLE_DEVICES=1`; output is filtered at score 0.25 and suppressed per class at IoU 0.45. Video and image folders were tested here. A physical webcam was unavailable.
 
 ## Preview and output

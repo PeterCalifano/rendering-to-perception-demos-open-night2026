@@ -27,6 +27,10 @@ namespace demo
 
 /** Pixel-domain tolerance for calibrated KLT geometric rejection. */
 inline constexpr double msac_max_distance_px = 1.0;
+/** Default and upper limit for active KLT tracks in these demos. */
+inline constexpr std::uint32_t default_max_features = 100U;
+/** Default and upper limit for new KLT features per extraction. */
+inline constexpr std::uint32_t default_max_new_features = 25U;
 
 class CModelAdapter;
 
@@ -181,11 +185,14 @@ class CFrameProcessor
      * @param image_size_px Source image dimensions.
      * @param mode Enabled KLT/centroid pair.
      * @param extraction KLT feature-eligibility policy.
+     * @param max_features Maximum active KLT tracks, in [1, 100].
+     * @param max_new_features Maximum admitted features per extraction, in [1, 25].
      * @param camera_intrinsics Matching pinhole calibration; enables MSAC when present.
      * @param centroid_model Optional centroid model path.
      * @param yolo_model Optional YOLOv7 model path.
      */
     CFrameProcessor(cv::Size image_size_px, EMode mode, EKltExtraction extraction,
+                    std::uint32_t max_features, std::uint32_t max_new_features,
                     std::optional<pyramid_klt::SCameraIntrinsics> camera_intrinsics = std::nullopt,
                     const std::filesystem::path& centroid_model = {},
                     const std::filesystem::path& yolo_model = {});
@@ -243,6 +250,14 @@ class CPreviewWindow
 
 /** Parse a required positive integral CLI value without accepting suffix text. */
 std::uint32_t ParsePositiveCount(const std::string& value, const char* option);
+
+/**
+ * @brief Reject KLT budgets outside the demo limits or inconsistent with each other.
+ * @param max_features Maximum active tracks, in [1, 100].
+ * @param max_new_features Maximum new tracks per extraction, in [1, 25].
+ * @throws std::invalid_argument if either bound or their ordering is invalid.
+ */
+void ValidateKltFeatureLimits(std::uint32_t max_features, std::uint32_t max_new_features);
 
 /** Quote and escape a string value for a JSON document. */
 std::string JsonQuote(std::string_view value);
