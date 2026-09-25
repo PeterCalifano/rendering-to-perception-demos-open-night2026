@@ -1,23 +1,30 @@
 # Rendering-to-perception demos
 
-Two C++20 programs use the same frame processor. `render_stream_demo` renders a Bayer sensor frame with Spectra-RT, reconstructs fixed-scale grayscale, and runs space-aware KLT, centroiding, or both. `camera_stream_demo` accepts a webcam, video, or image folder and can also run YOLOv7. Each processed frame gets colored overlays, a compact preview summary, one console line, and optional JSONL and PNG output. The stage record and measured checks are in [PLAN.md](PLAN.md).
+Two C++20 programs share a frame processor:
+
+- `render_stream_demo` renders a Bayer sensor frame with Spectra-RT, reconstructs fixed-scale grayscale, and runs space-aware KLT, centroiding, or both.
+- `camera_stream_demo` accepts a webcam, video, or image folder and can also run YOLOv7.
+
+Each processed frame gets colored overlays, a compact preview summary, two terminal log lines, and optional JSONL and PNG output. [PLAN.md](PLAN.md) records implementation stages and validation results.
 
 For another machine, use the [copy checklist and implementation handoff](doc/developments/2026-09-25_portability_and_implementation_handoff.md). It records external source snapshots, asset and model hashes, rebuild order, GPU assumptions, and the code ownership map.
 
-## Copyable local runtime
+## Copy the runtime to another machine
 
 Run `scripts/package_local_bundle.sh` after the ML-enabled build below. It creates
-ignored `external/` with the executables and installed native, OpenCV, ONNX,
-CUDA user-space, and OptiX files, plus ignored `assets/` with Bennu and both
-models. Copy the entire folder, including those ignored directories; cloning
-Git alone does not copy them. On a compatible Ubuntu x86-64 host with an NVIDIA
+an ignored `external/` directory with the executables and installed native, OpenCV,
+ONNX, CUDA user-space, and OptiX files, plus an ignored `assets/` directory with
+Bennu and both models. Copy the entire folder, including those ignored
+directories; a Git clone does not include them. On a compatible Ubuntu x86-64 host with an NVIDIA
 driver and CUDA GPU, run:
 
 ```sh
+./build.sh                 # Build both ML-enabled demos
+# ./build.sh --tests        # Also run the camera stream behavior test
 sha256sum -c external/BUNDLE.sha256
-scripts/run_local_bundle.sh render --scene sphere --spp 1 \
+DEMO_BINARY_DIR=build/portable scripts/run_local_bundle.sh render --scene sphere --spp 1 \
   --max-frames 1 --headless
-scripts/run_local_bundle.sh render --scene bennu --mode both \
+DEMO_BINARY_DIR=build/portable scripts/run_local_bundle.sh render --scene bennu --mode both \
   --centroid-model "$PWD/assets/models/centroid/best_model_plain_traveling-goat-68_22b61bbd4ddd.onnx" \
   --albedo-jpeg "$PWD/assets/rendering/assets/bodies/bennu/appearance/albedo/Bennu_OSIRIS-REx_5cm_v1.jpg" \
   --spp 1 --max-frames 1 --headless
@@ -32,6 +39,11 @@ caller; set `CUDA_VISIBLE_DEVICES` when the host has multiple GPUs. Set
 `DEMO_BINARY_DIR=build/portable` to run a rebuilt executable with the copied
 libraries. The host still supplies its driver, glibc, display stack, and codecs.
 The copied Spectra-RT binary must also support the destination GPU.
+`build.sh` configures `build/portable` with the copied CMake packages and
+enables both ML adapters. It needs the host C++20 compiler, CUDA toolkit,
+CMake, Ninja, Eigen, and development packages listed in the handoff; it does
+not download or install them. Pass `--jobs N` to change build parallelism or
+`--tests` to run the optional Python-backed behavior test.
 Rendered `run.json` uses schema version 2 and records the selected logical CUDA
 index, GPU name, and compute capability under `cuda_device`.
 
@@ -86,7 +98,9 @@ cmake --build build/demo -j 8
 ctest --test-dir build/demo --output-on-failure
 ```
 
-`DEMO_ENABLE_ML=OFF` builds KLT modes without AutoForge. The camera behavior test needs Python 3.12, OpenCV Python, and NumPy; set `DEMO_BUILD_TESTS=OFF` if those test dependencies are absent. The render target defines `EIGEN_MALLOC_ALREADY_ALIGNED=0` to match Spectra-RT's native-tuned Eigen allocation ABI. Spectra-RT and KLT both export `utils/logging/CLogger.h`; the render translation unit includes both named headers before shared APIs.
+`DEMO_ENABLE_ML=OFF` builds KLT modes without AutoForge. The camera behavior test needs Python 3.12, OpenCV Python, and NumPy; set `DEMO_BUILD_TESTS=OFF` if those test dependencies are absent.
+
+The render target defines `EIGEN_MALLOC_ALREADY_ALIGNED=0` to match Spectra-RT's native-tuned Eigen allocation ABI. Spectra-RT and KLT both export `utils/logging/CLogger.h`; the render translation unit includes both named headers before shared APIs.
 
 ## Rendered stream
 
@@ -137,8 +151,8 @@ The MP4 playback rate is an encoding choice, not a measured online frame rate. C
 
 The overlay uses up to eight recent positions per surviving KLT ID. Old positions are red, the middle is orange, and the current point is yellow. This bounded cache is for drawing only; KLT owns the IDs and track lifetime. Rendered KLT uses the frontend's essential-matrix MSAC rejection with the centered WFOV pinhole geometry (`fx = fy = 5840.9 px`, `cx = 1024 px`, `cy = 768 px`) and `msac_max_distance = 1.0 px`. A valid model retires rejected IDs before drawing; `WAIT` or `FAIL` performs no geometric rejection. Camera, video, and folder streams leave MSAC off because their calibration is unknown. At large phase angles, the lit surface narrows and surviving tracks near the terminator still need independent geometric validation.
 
-The optional `--albedo-jpeg FILE` path decodes a grayscale or BGR JPEG,
-converts sRGB to linear luminance, and quantizes one channel. That scalar map
+The optional `--albedo-jpeg FILE` argument loads a grayscale or BGR JPEG,
+converts sRGB to linear luminance, and quantizes it to one channel. That scalar map
 multiplies the nominal 0.05 Lambertian coefficient. Spectra-RT's CUDA upload
 replicates the channel without sRGB conversion, preserving wavelength-independent
 factorized transport. The map and coefficient are demonstration inputs, not
@@ -178,7 +192,7 @@ The bundled [WFOV response](config/camera_rgb_wfov/provenance.json) is provision
 
 ## Webcam, video, and image folders
 
-Choose exactly one source. Folder images are naturally sorted and must retain one resolution. File sources pace capture at `--fps` (default 15). Capture and processing each use a one-slot mailbox, so source indices can skip when processing falls behind. EOF drains the pending frame.
+Choose exactly one source. Folder images are naturally sorted and must all have the same resolution. File sources pace capture at `--fps` (default 15). Capture and processing each use a one-slot mailbox, so source indices can skip when processing falls behind. At EOF, processing finishes the pending frame.
 
 ```sh
 build/demo/camera_stream_demo --frames-dir /path/to/frames --fps 5
@@ -204,6 +218,13 @@ physical display remains untested on this machine.
 
 The first summary line shows source and processed indices, timestamp, KLT active/tracked/new/lost counts, centroid status and pixel coordinate, and YOLO count when enabled. Rendered frames also show MSAC status (`WAIT`, `VALID`, or `FAIL`) and rejected-track count, the Sun–body–camera phase angle, and body rotation phase. The second line shows mask state (`OFF`, `WAIT`, `READY`, or `EMPTY`), eligible fraction, extraction retry, stage times, and cumulative dropped frames. Small camera frames use three lines. `EMPTY` is normal for a dark frame; retry continues until the illuminated body returns. The same record goes to `frames.jsonl`, including active track IDs. `--output-dir` also writes `run.json` and one annotated PNG per processed frame under `frames/`. Interactive runs write nothing unless this option is supplied.
 
-Rendered JSONL records separate instance update, render, sensor readback, reconstruction and 8-bit scaling, KLT, and centroid times. The interactive programs print mean preview upload/draw/swap time after the window closes. These are stage timings, not a guaranteed display frame rate.
+The frame logger prints status followed by labeled stage times in milliseconds. Rendered
+frames show scene update, render, sensor readback, reconstruction and 8-bit scaling,
+KLT, and centroiding. Camera frames show capture, KLT, centroiding, and YOLO when
+enabled. `source` and `processing` are aggregate intervals that include their
+listed stages. The same measurements appear in `frames.jsonl` when output is
+enabled. Set `DEMO_LOG_LEVEL=quiet` to suppress the per-frame terminal lines.
+The interactive programs print mean preview upload/draw/swap time after the window
+closes. These stage times do not measure a guaranteed display frame rate.
 
 Keep demo output under the directory you choose. Spectra-RT's benchmark corpus and output tree have a separate required layout.
