@@ -92,16 +92,35 @@ CENTROID_MODEL=/home/peterc/devDir/ML-repos/.worktrees/android-app-experiment/ou
 CUDA_VISIBLE_DEVICES=1 build/demo/render_stream_demo --scene bennu --view whole_body \
   --camera-azimuth-deg 45 --orbit-step-deg 3 --spin-multiplier 250 \
   --mode both --centroid-model "$CENTROID_MODEL" --spp 8 --max-frames 50 \
-  --headless --output-dir build/evidence_bennu_phase_sweep
-ffmpeg -framerate 6 -i build/evidence_bennu_phase_sweep/frames/frame_%06d.png \
-  -c:v libx264 -crf 18 -pix_fmt yuv420p build/evidence_bennu_phase_sweep.mp4
+  --headless --output-dir build/evidence_bennu_phase_sweep_msac
+ffmpeg -framerate 6 -i build/evidence_bennu_phase_sweep_msac/frames/frame_%06d.png \
+  -c:v libx264 -crf 18 -pix_fmt yuv420p build/evidence_bennu_phase_sweep_msac.mp4
 ```
 
-The MP4 playback rate is an encoding choice, not a measured online frame rate. Camera steps are per rendered frame, while body spin follows elapsed wall time, so the exact body phase at each frame depends on processing time. The frame summaries and PNGs come directly from the running renderer and perception pipeline.
+The MP4 playback rate is an encoding choice, not a measured online frame rate. Camera steps are per rendered frame, while body spin follows elapsed wall time, so the exact body phase at each frame depends on processing time. The frame summaries and PNGs come directly from the running renderer and perception pipeline. The GPU 1 example recorded 50 frames from 12.0 to 145.1 degrees phase, with 49 accepted MSAC models, 1,453 rejected correspondences across the stream, and centroid `OK` in every frame. These rejections are geometric-model decisions, not labeled false matches.
 
-The overlay uses up to eight recent positions per surviving KLT ID. Old positions are red, the middle is orange, and the current point is yellow. This bounded cache is for drawing only; KLT owns the IDs and track lifetime. At large phase angles, the lit surface narrows and retained KLT tracks near the terminator need independent geometric validation.
+The overlay uses up to eight recent positions per surviving KLT ID. Old positions are red, the middle is orange, and the current point is yellow. This bounded cache is for drawing only; KLT owns the IDs and track lifetime. Rendered KLT uses the frontend's essential-matrix MSAC rejection with the centered WFOV pinhole geometry (`fx = fy = 5840.9 px`, `cx = 1024 px`, `cy = 768 px`) and `msac_max_distance = 1.0 px`. A valid model retires rejected IDs before drawing; `WAIT` or `FAIL` performs no geometric rejection. Camera, video, and folder streams leave MSAC off because their calibration is unknown. At large phase angles, the lit surface narrows and surviving tracks near the terminator still need independent geometric validation.
 
-The optional `--albedo-jpeg FILE` path decodes a grayscale or BGR JPEG, converts sRGB to linear luminance, quantizes one channel, and binds it as Lambertian albedo. **It currently reaches Spectra-RT's factorized texture-admission error.** [The review patch](patches/0001-admit-scalar-albedo-in-factorized-transport.patch) targets Spectra-RT `f948bd6` and passes `git apply --check`; it has not been applied or GPU-tested. After approval to edit that checkout, rebuild and install Spectra-RT before using:
+The optional `--albedo-jpeg FILE` path decodes a grayscale or BGR JPEG, converts sRGB to linear luminance, quantizes one channel, and multiplies the nominal 0.05 Lambertian coefficient by that scalar map. Spectra-RT's CUDA upload replicates the one channel without sRGB conversion, so its factorized transport remains wavelength independent. This map and coefficient are demonstration inputs, not calibrated Bennu reflectance. [The Spectra-RT patch](patches/0001-admit-scalar-albedo-in-factorized-transport.patch) targets `feature/implement-factorized-radiometry-mode` at `f948bd6`. It is applied but unstaged and uncommitted in that checkout for this run; the patch file is tracked in this demo repo. On a clean copy of that revision, apply it once before building:
+
+```sh
+git -C /home/peterc/devDir/rendering-sw/spectra-rt apply \
+  "$PWD/patches/0001-admit-scalar-albedo-in-factorized-transport.patch"
+```
+
+After the Spectra-RT configure in the Build section, run the GPU transport checks and reinstall the library. The factorized suite passed 1,379 assertions across 26 cases on GPU 1, including three-band sensor scaling and multi-channel/chromatic rejection; the material-update suite passed 386 assertions across 19 cases.
+
+```sh
+cmake -S /home/peterc/devDir/rendering-sw/spectra-rt -B build/spectra \
+  -DENABLE_TESTS=ON -DBUILD_TESTING=ON -DENABLE_FETCH_CATCH2=OFF
+cmake --build build/spectra --target testFactorizedTransport testSceneMaterials -j 8
+CUDA_VISIBLE_DEVICES=1 build/spectra/tests/core/testFactorizedTransport --reporter compact
+CUDA_VISIBLE_DEVICES=1 build/spectra/tests/core/testSceneMaterials --reporter compact
+cmake --install build/spectra
+cmake --build build/demo -j 8
+```
+
+Then render the textured scene:
 
 ```sh
 CUDA_VISIBLE_DEVICES=1 build/demo/render_stream_demo --scene bennu \
@@ -133,7 +152,11 @@ KLT uses illuminated-body masking and Kmeans coverage by default. Space-aware ex
 
 The render preview accepts left-drag to orbit, right-drag to pan, wheel to change distance, arrow keys to pan in the camera plane, `R` to restore the selected view and launch azimuth, and `Esc` to exit. The camera preview uses `Esc`. Resizing preserves image aspect ratio and the detector resolution remains fixed. Headless rendering requires `--max-frames`.
 
-The first summary line shows source and processed indices, timestamp, KLT active/tracked/new/lost counts, centroid status and pixel coordinate, and YOLO count when enabled. Rendered frames also show the Sun–body–camera phase angle and body rotation phase. The second line shows mask state (`OFF`, `WAIT`, `READY`, or `EMPTY`), eligible fraction, extraction retry, stage times, and cumulative dropped frames. Small camera frames use three lines. `EMPTY` is normal for a dark frame; retry continues until the illuminated body returns. The same record goes to `frames.jsonl`, including active track IDs. `--output-dir` also writes `run.json` and one annotated PNG per processed frame under `frames/`. Interactive runs write nothing unless this option is supplied.
+Injected X11 events under Xvfb exercised orbit, pan, zoom, arrows, reset, and exit. The saved
+frame summaries record the resulting phase-angle changes. Mouse and keyboard behavior on a
+physical display remains untested on this machine.
+
+The first summary line shows source and processed indices, timestamp, KLT active/tracked/new/lost counts, centroid status and pixel coordinate, and YOLO count when enabled. Rendered frames also show MSAC status (`WAIT`, `VALID`, or `FAIL`) and rejected-track count, the Sun–body–camera phase angle, and body rotation phase. The second line shows mask state (`OFF`, `WAIT`, `READY`, or `EMPTY`), eligible fraction, extraction retry, stage times, and cumulative dropped frames. Small camera frames use three lines. `EMPTY` is normal for a dark frame; retry continues until the illuminated body returns. The same record goes to `frames.jsonl`, including active track IDs. `--output-dir` also writes `run.json` and one annotated PNG per processed frame under `frames/`. Interactive runs write nothing unless this option is supplied.
 
 Rendered JSONL records separate instance update, render, sensor readback, reconstruction and 8-bit scaling, KLT, and centroid times. The interactive programs print mean preview upload/draw/swap time after the window closes. These are stage timings, not a guaranteed display frame rate.
 

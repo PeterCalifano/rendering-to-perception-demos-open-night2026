@@ -11,7 +11,7 @@ Build two C++20 streaming programs in this repo:
 
 `both` processes one source frame with KLT and centroiding and publishes one combined preview. The required first milestone is physical rendered frames with space-aware KLT tracks that retain IDs across camera motion. Centroiding and YOLOv7 are attempted with available models; record a concrete runtime blocker rather than delaying the KLT programs. No physical webcam is available here, so video and folder inputs supply acceptance evidence.
 
-Before editing source, write this plan, start the goal, and record the current state of every external checkout. Update checkboxes, commands, results, review findings, deferrals, and commit hashes as work advances. A checked item requires evidence. Do not change any external repo source without stopping for user review.
+Before editing source, write this plan, start the goal, and record the current state of every external checkout. Update checkboxes, commands, results, review findings, deferrals, and commit hashes as work advances. A checked item requires evidence. Stop for user review before an external repo source edit; the scalar-texture exception below received that approval on September 25.
 
 ## Technical contract
 
@@ -62,6 +62,8 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Add an eight-position red-to-yellow display trail for surviving KLT IDs and save a ten-frame Bennu MP4.
 - [x] Add continuous nominal-rate Bennu spin, a launch multiplier, fixed-Sun phase-angle diagnostics, and a launch camera azimuth.
 - [x] Verify changing body transforms with a fixed camera and a separate low-to-high phase-angle camera sweep on GPU 1. Save a measured-output overlay MP4 at a readable playback rate.
+- [x] Enable the KLT frontend's calibrated MSAC rejection for rendered frames using the WFOV ray geometry. Record model status and rejected tracks in the shared summary; keep uncalibrated camera/video inputs explicit.
+- [x] Check low-motion track retention and the high-phase sweep on GPU 1 with MSAC enabled. Review the updated overlay and save a separate filtered evidence clip.
 - [x] Review and commit the rendered-KLT capability using the commit style below.
 
 ### 3. Webcam, video, and frames folder
@@ -70,7 +72,7 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Generate moving space-like folder fixtures in the behavior test. Verify natural order, EOF, mask outcomes, and ID continuity.
 - [x] Run a disposable MJPG video fixture and verify bounded dropping with distinct source and processed indices.
 - [x] Launch both previews under Xvfb and review the control mapping. Document that a real PC webcam remains untested here.
-- [ ] Exercise mouse and arrow events on a physical interactive window; only Xvfb startup and deterministic orbit motion were tested here.
+- [ ] Exercise mouse and arrow events on a physical interactive window; injected Xvfb events passed, but no physical display is available here.
 - [x] Review and commit the camera/file stream capability.
 
 ### 4. Centroiding, combined mode, and YOLOv7
@@ -86,8 +88,8 @@ Before editing source, write this plan, start the goal, and record the current s
 
 - [x] Prepare a narrow patch against Spectra-RT `f948bd6`: admit valid single-channel scalar textures for achromatic Lambertian/Lommel-Seeliger factorized materials; retain RGB/RGBA and chromatic rejection. Update focused GPU tests and diagnostics.
 - [x] Review the patch and stop before changing Spectra-RT source. Preserve its unrelated `scripts/quick_demo/preview_model.sh` edit.
-- [ ] After approval, apply without a Spectra-RT commit, rebuild the demo-local install, and test textured factorized output on GPU 1.
-- [ ] Run textured Bennu in `klt`, `centroid`, and `both` where the model works. Keep patch, base revision, instructions, and evidence in the demo repo.
+- [x] After approval, apply without a Spectra-RT commit, rebuild the demo-local install, and test textured factorized output on GPU 1.
+- [x] Run textured Bennu in `klt`, `centroid`, and `both`. Keep patch, base revision, instructions, and evidence in the demo repo.
 
 ### 6. Final verification and handoff
 
@@ -95,6 +97,8 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Measure geometry load separately from render, readback, reconstruction, KLT/mask, centroid, YOLO, preview, and dropped frames. Report eight- and 32-sample runs separately; make no unmeasured FPS claim.
 - [x] Document quick-start commands, modes, controls, asset/model paths, resolved-body limits of space-aware extraction, camera limitations, and deferred models.
 - [x] Review full final diff and plan state; commit remaining demo-only work. Do not push or open a PR.
+- [x] Review the September 25 scalar-texture and MSAC diffs, rebuild both demo variants, and leave all new edits unstaged at the original handoff.
+- [x] On later authorization, commit the MSAC source and documentation batches only in this demo repo. Leave the Spectra-RT source patch unstaged and make no push.
 
 ## Review, commit, and comment rules
 
@@ -116,7 +120,7 @@ Example rendered-KLT body:
 
 Write brief imperative code comments for non-obvious steps and invariants, such as “Keep raw electrons unchanged before display scaling” and “Publish only after both results belong to this frame”. Group code by purpose; do not narrate obvious statements. Document public APIs with Doxygen.
 
-Stop for critical changes to the physical sensor, factorized path, KLT ownership, two-program design, or Bennu interpretation. Stop before any external-repo source edit. Ordinary demo-repo fixes may proceed; model-specific blockers may be deferred as stated above. Commit only in this repo and never push.
+Stop for critical changes to the physical sensor, factorized path, KLT ownership, two-program design, or Bennu interpretation. Stop before any further external-repo source edit. The approved scalar-texture edit is applied but unstaged in Spectra-RT. Ordinary demo-repo fixes may proceed; model-specific blockers may be deferred as stated above. Commit only in this repo and never push. The later commit authorization covers the demo repo only.
 
 ## Baseline at plan start (2026-09-24)
 
@@ -136,7 +140,7 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 
 - Installed Spectra-RT `f948bd6`, KLT `c714e1f`, and AutoForge `03bb25c` from out-of-source builds under ignored `build/` into ignored `deps/`. Used OpenCV 4.10 from `/usr/local`; Spectra-RT used CUDA architecture 89 and OptiX. A fresh `build/demo-fresh` ML-enabled configure/build and CTest pass, and a separate `build/demo-no-ml` configure/build pass.
 - `nvidia-smi` identifies physical GPU 1 as RTX 4070 Ti SUPER. Every renderer smoke used `CUDA_VISIBLE_DEVICES=1`; renderer logs confirm logical device 0 is that GPU.
-- Rechecked all five external statuses and unstaged diff hashes against the baseline table. Each count and hash was unchanged. No external source, gitlink, commit, or stage was modified. Only the template license entered this repo.
+- Before the approved Spectra-RT edit, rechecked all five external statuses and unstaged diff hashes against the baseline table. Each count and hash was unchanged. No external source, gitlink, commit, or stage had been modified. Only the template license entered this repo.
 - Stage 1 review: inspected the minimal exported file set, package links, include collision, Eigen allocation ABI, build options, C++ format, and fresh builds. The render target matches Spectra-RT's Eigen allocation setting; named logger headers resolve the KLT/Spectra include collision in this repo.
 
 ### Rendered KLT and combined mode
@@ -152,6 +156,12 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 - `build/camera_video_smoke` exercised MJPG video at 120 fps: three capture frames were superseded while processing kept distinct source and processed IDs. `build/final_camera_both` exercised folder KLT+centroid; `build/video_both_smoke` exercised video KLT+centroid. `build/camera_centroid_smoke` exercised centroid-only folder mode. No physical webcam was available.
 - `build/final_video_all` exercised KLT+centroid+YOLO on video. `build/final_yolo_dog` exercised the YOLO decoder/NMS with three visible boxes on a local dog/bicycle/car photo; inspected the annotated PNG. Its manifest reported `requested_targets=cuda,cpu;applied_ort_providers=cuda,cpu;device_id=0` under `CUDA_VISIBLE_DEVICES=1`. Centroid reported CPU provider. This proves runnable inference and overlays on these inputs, not detection accuracy.
 - `build/final_timed_camera_xvfb.log` and `build/final_timed_render_xvfb.log` show both preview programs started and exited under Xvfb. With no display, camera preview now exits cleanly with `Cannot initialize GLFW`; worker threads had not started. Physical mouse/key input events remain untested.
+- `build/xvfb_controls_final_wy7j9nit`: injected left and right drags, two wheel steps,
+  Right and Up arrows, `R`, and `Esc` into the mapped render preview under Xvfb with
+  `CUDA_VISIBLE_DEVICES=1`. The 63 saved 4-spp sphere frames and JSONL show phase angles
+  of 46.234 degrees initially, 20.172 after orbit, 22.504 after pan, 23.310 after zoom,
+  21.366 after Right, 20.660 after Up, and 46.234 after reset. `Esc` exited with status 0.
+  Inspected saved overlays. These were virtual X11 events, not physical-window input.
 - Stage 3 and 4 review: inspected one-slot capture and preview mailboxes, EOF drain, input validation, source/processed identity, model tensor layout, original-image YOLO input, class-aware NMS, coordinate mapping, centroid status, small-frame text fit, and Xvfb output.
 
 ### Timings and external patch gate
@@ -159,14 +169,14 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 - `build/final_timed_bennu_8`: one full Bennu frame at 8 spp. Scene load/build 16212.1 ms; render 27.1 ms; sensor readback 2.0 ms; reconstruction and fixed scaling 13.2 ms; KLT 77.8 ms; centroid 30.8 ms; zero drops. The separate earlier three-frame run establishes track persistence.
 - `build/final_timed_sphere_8`: three 8-spp frames; after first-frame work, render 9.4 ms, readback 2.0 ms, reconstruction 14.0-14.2 ms, KLT 78.0-79.4 ms, centroid 37.8-39.5 ms. `build/final_timed_sphere_32`: one 32-spp reference; render 42.0 ms, readback 2.0 ms, reconstruction 14.4 ms, KLT 97.8 ms. These are stage times, not end-to-end FPS claims.
 - Interactive Xvfb preview upload/draw/swap averaged 13.9 ms for two rendered frames and 5.6 ms for two camera frames. The YOLO dog first inference took 487.0 ms; a second video frame took 15.5 ms after warmup. These observations are input- and run-specific.
-- `--albedo-jpeg` decoded the full 15708 x 7854 Bennu JPEG and reached the expected current Spectra-RT error: `Factorized transport requires achromatic material coefficients and no albedo textures.` The prepared patch adds scalar-only admission and a focused GPU comparison test; RGB/RGBA rejection remains. `git apply --check patches/0001-admit-scalar-albedo-in-factorized-transport.patch` passes against Spectra-RT `f948bd6`. No patch was applied there, so textured output and its GPU test remain pending user approval for that external source edit.
+- At the original external-source gate, `--albedo-jpeg` decoded the full 15708 x 7854 Bennu JPEG and reached the former Spectra-RT texture-rejection error. The prepared patch added scalar-only admission and a focused GPU comparison test while retaining RGB/RGBA rejection. The patch was still unapplied at that gate; the user subsequently approved its narrow application on September 25.
 - Stage 5 review: inspected texture conversion, scalar upload behavior, material admission and update paths, diagnostics, and the focused test in the patch. Stage 6 review: ran `clang-format --dry-run --Werror`, CTest, fresh ML and no-ML builds, JSON/PNG checks, FFprobe, external dirty-state recheck, and the full source/documentation readability pass. After the rotation change, rebuilt ML and no-ML targets, reran CTest, rejected invalid spin and azimuth arguments, checked static sphere metadata, and reviewed the phase-sweep frames. Both source and documentation batches passed complete staged-diff checks.
 
 ### Commits
 
 - `f5b6150` `[MAJOR] Stream renderer and camera frames through perception`: staged 14 explicit source/config/test paths, reviewed the complete index, passed `git diff --cached --check`, and committed only this repo. The source programs share CMake and `demo_core`, so their functioning integration formed one cohesive source batch; the plan and operating instructions follow separately.
-- `38cf534` `Document demo operation and prepare scalar-albedo patch`: staged only `.gitattributes`, this plan, README, and the unapplied patch; reviewed their complete diff and passed `git diff --cached --check`. The path-specific attribute excludes inherent unified-diff context spaces from that whitespace check. The patch still passes `git apply --check` at Spectra-RT `f948bd6` and remains unapplied.
-- The final plan-ledger commit marks the completed local review and keeps physical webcam, physical input-event, and textured-Bennu checks unchecked until they can run.
+- `38cf534` `Document demo operation and prepare scalar-albedo patch`: staged only `.gitattributes`, this plan, README, and the then-unapplied patch; reviewed their complete diff and passed `git diff --cached --check`. The path-specific attribute excludes inherent unified-diff context spaces from that whitespace check. At the time, the patch passed `git apply --check` at Spectra-RT `f948bd6`.
+- The earlier plan-ledger commit marked the completed local review and kept physical webcam, physical input-event, and textured-Bennu checks unchecked. Textured-Bennu checks were completed after the external edit was approved; the physical-device checks remain open.
 - `0da0841` `[BUGFIX] Use spacecraft-measured Bennu rotation period`: replaced the older radar period with the OSIRIS-REx 2018 spacecraft measurement, rebuilt ML and no-ML variants, reran CTest, regenerated the GPU 1 phase-sweep clip, and reviewed the three-file staged diff.
 
 ### Requested rotation and phase-angle extension
@@ -175,3 +185,13 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 - `build/spin_smoke`: three untextured Bennu frames on GPU 1 with fixed camera azimuth 45 degrees and 3000x spin. Frame diagnostics kept the Sun–body–camera phase at 12.0 degrees while body phase moved from 0.0 to 31.1 degrees. KLT kept all 150 IDs. Renderer code reuses geometry and updates the instance acceleration structure.
 - `build/evidence_bennu_phase_sweep`: 50 untextured Bennu frames on GPU 1, KLT and centroiding together, camera start 45 degrees, 3 degrees per frame, body spin 250x. `run.json` records the 15465.6252-second reference period. Phase angle rose monotonically from 12.0 to 145.1 degrees; body phase rose from 0.0 to 61.8 degrees; centroid status was `OK` throughout; KLT had 288 active tracks at frame 49; zero dropped frames. Median post-first-frame scene update was 0.286 ms. Inspected the final frame for lighting, colored trails, centroid crosshair, and diagnostic text. Encoded `build/evidence_bennu_phase_sweep.mp4` as H.264, 2048 x 1536, 50 frames, 8.33 seconds at an intentionally chosen 6 fps playback rate. This MP4 records real processed frames; the playback rate is independent of the wall-time spin rate.
 - The regenerated MP4 is 3,480,602 bytes with SHA-256 `8d200643c8824464905fc8a77dbe577dc85f12e154f2093e03af365b5be76e10`. It lives under ignored `build/` and remains available locally.
+
+## September 25 scalar-texture and geometric-rejection extension
+
+- With explicit user approval, applied the reviewed scalar-texture patch only to Spectra-RT `src/core/CSpectralRaytracer.cpp`, `src/kernels/raytracer_kernels.ptx.cu`, `src/scene/CSceneMaterials.cpp`, `src/scene/CSceneMaterials.h`, and `tests/core/testFactorizedTransport.cpp` on branch `feature/implement-factorized-radiometry-mode` at `f948bd6`. Left every change unstaged and preserved the pre-existing quick-demo script edit. Rebuilt the demo-local Spectra-RT install. On physical GPU 1, `testFactorizedTransport` passed 1,379 assertions in 26 cases and `testSceneMaterials` passed 386 assertions in 19 cases. After the final whitespace edit, rebuilt both test targets and reran the focused scalar-texture case: 17 assertions passed. Grayscale 128/255 scales raw factorized Lambertian and Lommel-Seeliger transport and each of three sensor bands by the same factor; two-, three-, and four-channel textures and chromatic coefficients remain rejected. This checks the factorization contract, not measured Bennu reflectance.
+- Ran textured Bennu on GPU 1 with `--albedo-jpeg` in `klt`, `centroid`, and `both` modes. The three-frame combined run kept 150 IDs, reported centroid `OK` on all frames, and reported MSAC `VALID` on both transitions with zero geometric rejections. The standalone KLT and centroid modes also completed. The JPEG's decoded linear luminance multiplies the nominal 0.05 Lambertian coefficient; these inputs are demonstration values.
+- Enabled the KLT frontend's essential-matrix MSAC only for rendered KLT frames. The WFOV profile resolves to a centered, zero-skew pinhole with `fx=fy=5840.90918 px`, `cx=1024 px`, and `cy=768 px`; one pixel is the accepted residual threshold. Disposable off-center and NaN-principal-point profiles exited before rendering with the calibration mismatch diagnostic. Unknown webcam/video/folder calibration leaves geometric rejection `OFF`. `WAIT` and `FAIL` perform no geometric rejection; only `VALID` retires rejected IDs. The overlay trail cache follows surviving frontend IDs.
+- `build/evidence_bennu_phase_sweep_msac`: 50 untextured Bennu frames at 8 spp with KLT and centroiding, camera azimuth 45 degrees, three-degree orbit steps, and 250x body spin. On GPU 1, phase rose from 11.976712 to 145.126152 degrees. MSAC was `WAIT` on the first frame and `VALID` on 49 transitions, retiring 1,453 correspondences in total; 30 active tracks remained at the final crescent. Centroid was `OK` for all 50 frames; zero frames dropped. Inspected the final annotated PNG. `build/evidence_bennu_phase_sweep_msac.mp4` is H.264, 2048 x 1536, 50 frames, 8.33 seconds at chosen 6 fps playback, SHA-256 `39659398fe8f130007bc04f26992a85b4b2b69e13aed8508dd90e24fdd48b5e8`. These are MSAC model rejections, not labeled false matches; the moving body may also violate rigid static-scene assumptions.
+- Rebuilt the ML and no-ML demo variants after the final calibration check. `camera_stream_contract` passed and confirmed `MSAC OFF` for uncalibrated file input. Reviewed the source and documentation diffs, formatting, patch reversibility, output JSON, clip probe, and unstaged worktree boundaries. At the original September 25 handoff, this work had made no new commit, stage, or push.
+- During the final worktree check, additional unstaged Spectra-RT edits appeared in `src/core/CSpectralRaytracer.h`, `src/core/CSpectralRaytracerWrapper.cpp`, `src/spectra_rt.i`, and `tests/core/testRayTracerConfig.cpp`. They are outside this patch and were left untouched. The original GPU tests and rendered evidence above predate those edits; the later focused GPU reruns check the two named suites in their presence, not the unrelated wrapper behavior.
+- The later demo-only authorization produced `1a75f6b` `[MAJOR] Reject geometric outliers in rendered KLT streams` from the five source/test paths. The ML and no-ML builds, CTest, final source diff, and `git diff --cached --check` passed before that commit. Rebuilt the Spectra-RT focused test targets and reran both GPU 1 suites afterward: 1,379 factorized assertions and 386 material assertions passed. The patch artifact exactly matched the five owned Spectra-RT diffs. The documentation and patch artifact form a separate demo commit; all Spectra-RT edits remain unstaged and uncommitted.

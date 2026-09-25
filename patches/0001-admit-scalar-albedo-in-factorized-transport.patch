@@ -1,28 +1,36 @@
---- a/src/scene/CSceneMaterials.h
-+++ b/src/scene/CSceneMaterials.h
-@@ -120,7 +120,7 @@
-          */
-         [[nodiscard]] const SHapkeFullCoefficients *fullHapke(size_t meshIndex) const;
+diff --git a/src/core/CSpectralRaytracer.cpp b/src/core/CSpectralRaytracer.cpp
+index 0396fc5..3ee3a9b 100644
+--- a/src/core/CSpectralRaytracer.cpp
++++ b/src/core/CSpectralRaytracer.cpp
+@@ -2912,7 +2912,7 @@ namespace spectra_rt
+         if (radiometryMode == ERadiometryMode::FACTORIZED_SPECTRAL &&
+             !materials.supportsFactorized())
+         {
+-            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and no albedo textures.");
++            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and only single-channel albedo textures.");
+         }
+         if (radiometryMode == ERadiometryMode::FULL_SPECTRAL &&
+             !materials.supportsScalarInterfaces())
+diff --git a/src/kernels/raytracer_kernels.ptx.cu b/src/kernels/raytracer_kernels.ptx.cu
+index ccf2cee..3d2df08 100644
+--- a/src/kernels/raytracer_kernels.ptx.cu
++++ b/src/kernels/raytracer_kernels.ptx.cu
+@@ -61,8 +61,8 @@ namespace spectra_rt
+     // Auxiliary device functions
  
--        /// @return Whether every material meets achromatic, texture-free factorized admission.
-+        /// @return Whether every material meets achromatic, scalar-texture factorized admission.
-         [[nodiscard]] bool supportsFactorized() const noexcept { return nonFactorizedCount_ == 0; }
- 
-         /// @return Whether every material can use the opaque reflection profile.
-@@ -144,8 +144,8 @@
-         };
- 
-         static SRecord Resolve(const SMaterialDescriptor &material, const STriangleMesh &mesh,
--                               size_t textureCount);
--        static bool SupportsFactorized(const SRecord &record);
-+                               const CTriangMeshedModel &model);
-+        static bool SupportsFactorized(const SRecord &record, const CTriangMeshedModel &model);
-         static bool SupportsScalarInterfaces(const SRecord &record);
- 
-         struct SAssetRange
+     // Texture management
+-    // Keep sampled textures in the RGB material path; wavelength-dependent texture
+-    // transport remains outside the current factorized measurement contract.
++    // Admit only achromatic maps to scalar factorized transport at material validation.
++    // Keep wavelength-dependent texture transport outside the measurement contract.
+     static __forceinline__ __device__ gdt::vec2f InterpolateTriangleTexcoord_(const gdt::vec2f &texA,
+                                                                               const gdt::vec2f &texB,
+                                                                               const gdt::vec2f &texC,
+diff --git a/src/scene/CSceneMaterials.cpp b/src/scene/CSceneMaterials.cpp
+index 15ebd1f..e651da2 100644
 --- a/src/scene/CSceneMaterials.cpp
 +++ b/src/scene/CSceneMaterials.cpp
-@@ -22,7 +22,7 @@
+@@ -22,7 +22,7 @@ namespace spectra_rt
  
      CSceneMaterials::SRecord CSceneMaterials::Resolve(const SMaterialDescriptor &material,
                                                        const STriangleMesh &mesh,
@@ -31,7 +39,7 @@
      {
          SRecord record{CBsdfParameters::resolve(material), material.diffuseAlbedoTextureID, nullptr, nullptr};
  
-@@ -34,8 +34,9 @@
+@@ -34,8 +34,9 @@ namespace spectra_rt
  
          if (record.textureIndex >= 0)
          {
@@ -42,23 +50,22 @@
              if (mesh.texcoord.size() != mesh.vertex.size())
                  throw std::invalid_argument("Albedo textures require one UV per vertex.");
              for (const auto &uv : mesh.texcoord)
-@@ -87,9 +88,12 @@
+@@ -87,9 +88,12 @@ namespace spectra_rt
          return record;
      }
  
 -    bool CSceneMaterials::SupportsFactorized(const SRecord &record)
--    {
--        if (record.textureIndex >= 0)
 +    bool CSceneMaterials::SupportsFactorized(const SRecord &record,
 +                                             const CTriangMeshedModel &model)
-+    {
+     {
+-        if (record.textureIndex >= 0)
 +        // Admit only one-channel images as achromatic after RGBA upload.
 +        if (record.textureIndex >= 0 &&
 +            model.getTextureAtIndex(record.textureIndex).channels != 1U)
              return false;
          switch (record.parameters.type())
          {
-@@ -177,8 +181,8 @@
+@@ -177,8 +181,8 @@ namespace spectra_rt
                                       static_cast<size_t>(texture) - asset.firstTexture >= asset.textureCount))
                      throw std::invalid_argument("Initial material texture index is outside its asset registry.");
  
@@ -69,7 +76,7 @@
                  nonOpaqueCount_ += !record.parameters.supportsOpaqueTransport();
                  nonScalarInterfaceCount_ += !SupportsScalarInterfaces(record);
                  records_[index] = std::move(record);
-@@ -216,7 +220,7 @@
+@@ -216,7 +220,7 @@ namespace spectra_rt
                  material.diffuseAlbedoTextureID = static_cast<int>(globalTexture);
              }
              replacements.push_back({index, Resolve(material,
@@ -78,7 +85,7 @@
          }
          std::sort(replacements.begin(), replacements.end(),
                    [](const auto &a, const auto &b)
-@@ -233,8 +237,8 @@
+@@ -233,8 +237,8 @@ namespace spectra_rt
                  throw std::invalid_argument("Duplicate material update target.");
              changed.push_back(replacement.meshIndex);
              const auto &previous = records_[replacement.meshIndex];
@@ -89,7 +96,7 @@
              nextNonOpaque -= !previous.parameters.supportsOpaqueTransport();
              nextNonOpaque += !replacement.record.parameters.supportsOpaqueTransport();
              nextNonScalarInterface -= !SupportsScalarInterfaces(previous);
-@@ -242,7 +246,7 @@
+@@ -242,7 +246,7 @@ namespace spectra_rt
          }
  
          if (requireFactorized && nextNonFactorized != 0)
@@ -98,20 +105,77 @@
          if (requireOpaque && nextNonOpaque != 0)
              throw std::invalid_argument("Material requires the generic surface transport profile.");
  
---- a/src/core/CSpectralRaytracer.cpp
-+++ b/src/core/CSpectralRaytracer.cpp
-@@ -2912,7 +2912,7 @@
-         if (radiometryMode == ERadiometryMode::FACTORIZED_SPECTRAL &&
-             !materials.supportsFactorized())
-         {
--            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and no albedo textures.");
-+            throw std::invalid_argument("Factorized transport requires achromatic material coefficients and only single-channel albedo textures.");
-         }
-         if (radiometryMode == ERadiometryMode::FULL_SPECTRAL &&
-             !materials.supportsScalarInterfaces())
+diff --git a/src/scene/CSceneMaterials.h b/src/scene/CSceneMaterials.h
+index 3c42048..9415ce3 100644
+--- a/src/scene/CSceneMaterials.h
++++ b/src/scene/CSceneMaterials.h
+@@ -120,7 +120,7 @@ namespace spectra_rt
+          */
+         [[nodiscard]] const SHapkeFullCoefficients *fullHapke(size_t meshIndex) const;
+ 
+-        /// @return Whether every material meets achromatic, texture-free factorized admission.
++        /// @return Whether every material meets achromatic, scalar-texture factorized admission.
+         [[nodiscard]] bool supportsFactorized() const noexcept { return nonFactorizedCount_ == 0; }
+ 
+         /// @return Whether every material can use the opaque reflection profile.
+@@ -144,8 +144,8 @@ namespace spectra_rt
+         };
+ 
+         static SRecord Resolve(const SMaterialDescriptor &material, const STriangleMesh &mesh,
+-                               size_t textureCount);
+-        static bool SupportsFactorized(const SRecord &record);
++                               const CTriangMeshedModel &model);
++        static bool SupportsFactorized(const SRecord &record, const CTriangMeshedModel &model);
+         static bool SupportsScalarInterfaces(const SRecord &record);
+ 
+         struct SAssetRange
+diff --git a/tests/core/testFactorizedTransport.cpp b/tests/core/testFactorizedTransport.cpp
+index 9cd4013..fc8325d 100644
 --- a/tests/core/testFactorizedTransport.cpp
 +++ b/tests/core/testFactorizedTransport.cpp
-@@ -1201,6 +1201,36 @@
+@@ -1153,22 +1153,26 @@ TEST_CASE("Factorized material and source-shape validation rejects unsupported i
+     {
+         SKIP("A CUDA device is required for transport tests.");
+     }
+-    SECTION("Factorized transport rejects a valid albedo texture binding")
++    SECTION("Factorized transport rejects multi-channel albedo textures")
+     {
+-        image_io::SImageData texture;
+-        texture.width = texture.height = 1U;
+-        texture.channels = 4U;
+-        texture.scalarType = image_io::EImageScalarType::UINT8;
+-        texture.rowStrideBytes = 4U;
+-        texture.storage = {255U, 255U, 255U, 255U};
+-        STransportFixture fixture(SMaterialDescriptor{SLambertianParams{Vec3Type(1.0f)}, 0},
+-                                  &texture);
+-        fixture.enableMeasurement();
+-        fixture.renderer.setLaunchParams(fixture.params);
+-        REQUIRE_THROWS_WITH(fixture.renderer.render(),
+-                            Catch::Matchers::ContainsSubstring("Pipeline and SBT"));
+-        REQUIRE_THROWS_WITH(fixture.renderer.buildPipelineAndSBT(),
+-                            Catch::Matchers::ContainsSubstring("albedo textures"));
++        for (const uint32_t channels : {2U, 3U, 4U})
++        {
++            CAPTURE(channels);
++            image_io::SImageData texture;
++            texture.width = texture.height = 1U;
++            texture.channels = channels;
++            texture.scalarType = image_io::EImageScalarType::UINT8;
++            texture.rowStrideBytes = channels;
++            texture.storage.resize(channels, 255U);
++            STransportFixture fixture(SMaterialDescriptor{SLambertianParams{Vec3Type(1.0f)}, 0},
++                                      &texture);
++            fixture.enableMeasurement();
++            fixture.renderer.setLaunchParams(fixture.params);
++            REQUIRE_THROWS_WITH(fixture.renderer.render(),
++                                Catch::Matchers::ContainsSubstring("Pipeline and SBT"));
++            REQUIRE_THROWS_WITH(fixture.renderer.buildPipelineAndSBT(),
++                                Catch::Matchers::ContainsSubstring("albedo textures"));
++        }
+     }
+     SECTION("Non-finite achromatic material is not accepted as a scalar")
+     {
+@@ -1201,6 +1205,61 @@ TEST_CASE("Factorized material and source-shape validation rejects unsupported i
      }
  }
  
@@ -131,18 +195,43 @@
 +        const SMaterialDescriptor::TModel model = lommel
 +            ? SMaterialDescriptor::TModel(SLommelSeeligerParams{Vec3Type(0.5f)})
 +            : SMaterialDescriptor::TModel(SLambertianParams{Vec3Type(0.5f)});
-+        STransportFixture plain(SMaterialDescriptor{model, -1});
-+        plain.params.renderSettings.radiometryMode = ERadiometryMode::FACTORIZED_SPECTRAL;
-+        plain.install();
-+        const auto reference = plain.renderer.render();
-+
-+        STransportFixture mapped(SMaterialDescriptor{model, 0}, &texture);
-+        mapped.params.renderSettings.radiometryMode = ERadiometryMode::FACTORIZED_SPECTRAL;
-+        mapped.install();
-+        const auto textured = mapped.renderer.render();
-+        REQUIRE(reference[0] > 0.0f);
-+        CHECK(textured[0] == Catch::Approx(reference[0] * 128.0f / 255.0f).epsilon(5e-5));
++        for (const bool measurement : {false, true})
++        {
++            CAPTURE(lommel, measurement);
++            STransportFixture plain(SMaterialDescriptor{model, -1});
++            STransportFixture mapped(SMaterialDescriptor{model, 0}, &texture);
++            for (STransportFixture *fixture : {&plain, &mapped})
++            {
++                fixture->params.renderSettings.radiometryMode = ERadiometryMode::FACTORIZED_SPECTRAL;
++                if (measurement)
++                {
++                    fixture->enableMeasurement();
++                    fixture->params.renderSettings.factorizedSensorWavebands = EFactorizedSensorWavebands::RGB;
++                    fixture->params.factorizedMeasurement.wavebandCount = 3U;
++                    fixture->params.factorizedMeasurement.wavebandScale[0] = 2.0f;
++                    fixture->params.factorizedMeasurement.wavebandScale[1] = 3.0f;
++                    fixture->params.factorizedMeasurement.wavebandScale[2] = 5.0f;
++                }
++                fixture->install();
++            }
++            const auto reference = plain.renderer.render();
++            const auto textured = mapped.renderer.render();
++            const std::size_t activeBands = measurement ? 3U : 1U;
++            for (std::size_t band = 0; band < activeBands; ++band)
++            {
++                REQUIRE(reference[band] > 0.0f);
++                CHECK(textured[band] ==
++                      Catch::Approx(reference[band] * 128.0f / 255.0f).epsilon(5e-5));
++            }
++        }
 +    }
++
++    STransportFixture chromatic(
++        SMaterialDescriptor{SLambertianParams{Vec3Type(0.25f, 0.5f, 0.75f)}, 0}, &texture);
++    chromatic.params.renderSettings.radiometryMode = ERadiometryMode::FACTORIZED_SPECTRAL;
++    chromatic.renderer.setLaunchParams(chromatic.params);
++    REQUIRE_THROWS_WITH(chromatic.renderer.buildPipelineAndSBT(),
++                        Catch::Matchers::ContainsSubstring("achromatic material"));
 +}
 +
  TEST_CASE("Typed material amplitude reaches RGB and physical output exactly once",
