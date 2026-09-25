@@ -109,9 +109,10 @@ DEMO_BINARY_DIR=build/portable scripts/run_local_bundle.sh render \
 ```
 
 `build.sh --jobs N` sets build parallelism. `build.sh --tests` also configures
-and runs the Python-backed camera behavior test. The script checks that the
-copied build packages exist before configuring. The equivalent manual CMake
-commands are:
+and runs the Python-backed camera behavior test with the copied native,
+ONNX Runtime, OpenCV, and CUDA runtime libraries on its loader path. The script
+checks that the copied build packages exist before configuring. The equivalent
+manual CMake commands are:
 
 ```sh
 demo_root=$PWD

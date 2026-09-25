@@ -77,7 +77,11 @@ cmake -S "$demo_root" -B "$build_dir" -G Ninja \
 cmake --build "$build_dir" --parallel "$jobs"
 
 if [[ $build_tests == ON ]]; then
-    ctest --test-dir "$build_dir" --output-on-failure
+    # Resolve test binaries against the copied libraries, as the launcher does.
+    bundle_library_path="$demo_root/external/native/lib:$demo_root/external/onnxruntime/lib"
+    bundle_library_path+=":$demo_root/external/opencv/lib:$demo_root/external/cuda-runtime/lib"
+    LD_LIBRARY_PATH="$bundle_library_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        ctest --test-dir "$build_dir" --output-on-failure
 fi
 
 printf 'Built both demos in %s\n' "$build_dir"
