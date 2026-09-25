@@ -92,7 +92,7 @@ SOptions ParseOptions(int argc, char** argv)
         if (key == "--help")
         {
             std::cout << "render_stream_demo [--scene sphere|bennu] [--model OBJ]\n"
-                         "  [--albedo-jpeg FILE] (Bennu; needs Spectra scalar-texture patch)\n"
+                         "  [--albedo-jpeg FILE] (Bennu; requires scalar-texture Spectra-RT)\n"
                          "  [--view whole_body|approach|surface] [--camera-yaml FILE]\n"
                          "  [--mode klt|centroid|both] [--centroid-model ONNX]\n"
                          "  [--spp N] [--max-frames N]\n"
@@ -359,6 +359,31 @@ double PhaseAngleDeg(const vec3f& camera_position_km)
     return std::acos(std::clamp(cosine, -1.0f, 1.0f)) / radians_per_degree;
 }
 
+pyramid_klt::SCameraIntrinsics MakeKltCamera(const spectra_rt::SCameraSensorConfig& sensor)
+{
+    const auto& intrinsics = sensor.camera.intrinsics;
+    const double center_x_px = 0.5 * intrinsics.frameWidth_px;
+    const double center_y_px = 0.5 * intrinsics.frameHeight_px;
+    // Match the centered, zero-skew pinhole rays traced by MakeCameraFromConfig.
+    if (intrinsics.model != spectra_rt::SCameraIntrinsics::ECameraModel::Pinhole ||
+        intrinsics.skew != 0.0f || !std::isfinite(intrinsics.principalPointX_px) ||
+        !std::isfinite(intrinsics.principalPointY_px) ||
+        std::abs(intrinsics.principalPointX_px - center_x_px) > 1e-3 ||
+        std::abs(intrinsics.principalPointY_px - center_y_px) > 1e-3)
+        throw std::invalid_argument("Rendered KLT MSAC requires centered, zero-skew pinhole rays");
+    if (!std::isfinite(intrinsics.focalLengthX_px) || !std::isfinite(intrinsics.focalLengthY_px) ||
+        intrinsics.focalLengthX_px <= 0.0f || intrinsics.focalLengthY_px <= 0.0f)
+        throw std::invalid_argument("Rendered KLT MSAC requires positive finite focal lengths");
+    pyramid_klt::SCameraIntrinsics klt_camera;
+    klt_camera.image_width = static_cast<std::uint32_t>(intrinsics.frameWidth_px);
+    klt_camera.image_height = static_cast<std::uint32_t>(intrinsics.frameHeight_px);
+    klt_camera.fx = intrinsics.focalLengthX_px;
+    klt_camera.fy = intrinsics.focalLengthY_px;
+    klt_camera.cx = center_x_px;
+    klt_camera.cy = center_y_px;
+    return klt_camera;
+}
+
 spectra_rt::CScene MakeScene(const SOptions& options)
 {
     using namespace spectra_rt;
@@ -412,6 +437,9 @@ void Render(const SOptions& options, SCameraControl& control,
         throw std::invalid_argument("The demo requires the 2048x1536 Bayer WFOV profile");
     if (!(sensor.film.fullWellCapacity > 0.0f) || !std::isfinite(sensor.film.fullWellCapacity))
         throw std::invalid_argument("The WFOV full-well reference must be positive and finite");
+    std::optional<pyramid_klt::SCameraIntrinsics> klt_camera;
+    if (options.mode != demo::EMode::Centroid)
+        klt_camera = MakeKltCamera(sensor);
 
     const auto scene_start = Clock::now();
     auto scene = MakeScene(options);
@@ -458,7 +486,7 @@ void Render(const SOptions& options, SCameraControl& control,
     std::vector<float> grayscale_electrons(pixels);
     cv::Mat processing_gray(image_size_px, CV_8UC1);
     demo::CFrameProcessor processor(image_size_px, options.mode, demo::EKltExtraction::Space,
-                                    options.centroid_model);
+                                    klt_camera, options.centroid_model);
     demo::CFrameWriter writer(options.output_dir);
     const bool body_spins = options.scene == "bennu" && options.spin_multiplier > 0.0;
     const std::vector<SSceneInstanceConfig> body_instances{MakeBodyInstance(options)};
@@ -486,7 +514,12 @@ void Render(const SOptions& options, SCameraControl& control,
              << ",\"model\":" << demo::JsonQuote(options.model.string())
              << ",\"albedo_jpeg\":" << demo::JsonQuote(options.albedo_jpeg.string())
              << ",\"camera_yaml\":" << demo::JsonQuote(options.camera_yaml.string())
-             << ",\"centroid_model\":" << demo::JsonQuote(options.centroid_model.string())
+             << ",\"klt_outlier_rejection\":" << demo::JsonQuote(klt_camera ? "msac" : "off");
+    if (klt_camera)
+        metadata << ",\"klt_camera_px\":{\"fx\":" << klt_camera->fx << ",\"fy\":" << klt_camera->fy
+                 << ",\"cx\":" << klt_camera->cx << ",\"cy\":" << klt_camera->cy << '}'
+                 << ",\"klt_msac_max_distance_px\":" << demo::msac_max_distance_px;
+    metadata << ",\"centroid_model\":" << demo::JsonQuote(options.centroid_model.string())
              << ",\"width_px\":" << image_size_px.width << ",\"height_px\":" << image_size_px.height
              << ",\"preview_white_electrons\":" << sensor.film.fullWellCapacity
              << ",\"spp\":" << options.spp << ",\"physical_gpu_index\":1,\"world_unit_m\":1000}";

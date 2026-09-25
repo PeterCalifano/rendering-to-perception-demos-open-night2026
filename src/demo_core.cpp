@@ -43,6 +43,23 @@ std::string MaskName(pyramid_klt::EIlluminatedBodyMaskStatus status)
     return "UNKNOWN";
 }
 
+std::string MsacName(pyramid_klt::EMsacStatus status)
+{
+    using Status = pyramid_klt::EMsacStatus;
+    switch (status)
+    {
+    case Status::Disabled:
+        return "OFF";
+    case Status::InsufficientCorrespondences:
+        return "WAIT";
+    case Status::Valid:
+        return "VALID";
+    case Status::ModelFailure:
+        return "FAIL";
+    }
+    return "UNKNOWN";
+}
+
 void DrawSummary(cv::Mat& image, const SFrameSummary& summary)
 {
     const bool compact = image.cols < 1000;
@@ -91,6 +108,8 @@ void DrawSummary(cv::Mat& image, const SFrameSummary& summary)
                    << summary.centroid_px->y << ")";
         if (summary.yolo_enabled)
             second << "  YOLO " << summary.yolo_detections;
+        if (summary.msac_status != "OFF")
+            second << "  MSAC " << summary.msac_status << " -" << summary.msac_outliers;
         draw_line(first.str(), 22, text_color, 0.53);
         draw_line(second.str(), 47, text_color, 0.49);
         draw_line(timing.str(), 72, cv::Scalar(171, 206, 226), 0.48);
@@ -124,6 +143,8 @@ std::string SFrameSummary::line() const
     }
     if (yolo_enabled)
         out << "  YOLO " << yolo_detections;
+    if (msac_status != "OFF")
+        out << "  MSAC " << msac_status << " -" << msac_outliers;
     if (phase_angle_deg)
         out << "  phase " << std::setprecision(1) << *phase_angle_deg << " deg";
     if (body_spin_phase_deg)
@@ -142,6 +163,7 @@ std::string SFrameSummary::json() const
         << ",\"lost_features\":" << lost_features << ",\"mask_status\":\"" << mask_status << "\""
         << ",\"eligible_fraction\":" << eligible_fraction
         << ",\"extraction_retry\":" << (extraction_retry ? "true" : "false")
+        << ",\"msac_status\":\"" << msac_status << "\",\"msac_outliers\":" << msac_outliers
         << ",\"centroid_status\":\"" << centroid_status << "\"" << ",\"source_ms\":" << source_ms
         << ",\"render_ms\":" << render_ms << ",\"readback_ms\":" << readback_ms
         << ",\"reconstruction_ms\":" << reconstruction_ms
@@ -168,6 +190,7 @@ std::string SFrameSummary::json() const
 }
 
 CFrameProcessor::CFrameProcessor(cv::Size image_size_px, EMode mode, EKltExtraction extraction,
+                                 std::optional<pyramid_klt::SCameraIntrinsics> camera_intrinsics,
                                  const std::filesystem::path& centroid_model,
                                  const std::filesystem::path& yolo_model)
     : mode_(mode)
@@ -181,6 +204,16 @@ CFrameProcessor::CFrameProcessor(cv::Size image_size_px, EMode mode, EKltExtract
         pyramid_klt::SKltPipelineSettings settings;
         settings.camera.image_width = static_cast<std::uint32_t>(image_size_px.width);
         settings.camera.image_height = static_cast<std::uint32_t>(image_size_px.height);
+        if (camera_intrinsics)
+        {
+            if (camera_intrinsics->image_width != settings.camera.image_width ||
+                camera_intrinsics->image_height != settings.camera.image_height)
+                throw std::invalid_argument("KLT calibration must match the input image size");
+            settings.camera = *camera_intrinsics;
+            settings.tracker_settings.outlier_rejection_flag = true;
+            // Allow one pixel of localization error before rejecting epipolar outliers.
+            settings.tracker_settings.msac_max_distance = msac_max_distance_px;
+        }
         settings.detector.selection_policy = pyramid_klt::EFeatureSelectionPolicy::KmeansCoverage;
         settings.illumination_mask.enabled = extraction == EKltExtraction::Space;
         klt_.emplace(settings);
@@ -250,6 +283,8 @@ SPreviewFrame CFrameProcessor::process(const SSourceFrame& frame, std::uint64_t 
         summary.mask_status = MaskName(result.illumination_mask_status);
         summary.eligible_fraction = result.illumination_eligible_fraction;
         summary.extraction_retry = result.extraction_retry_pending;
+        summary.msac_status = MsacName(result.msac_status);
+        summary.msac_outliers = result.msac_outlier_input_indices.size();
 
         // Cache display positions only; KLT owns the IDs and retires lost tracks.
         std::unordered_map<std::uint64_t, std::deque<cv::Point2f>> active_trails_px;

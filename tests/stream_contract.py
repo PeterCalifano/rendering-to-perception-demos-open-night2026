@@ -63,6 +63,8 @@ def main(executable: Path) -> None:
         assert len(records) == 5, records
         assert [item["source_index"] for item in records] == list(range(5))
         assert [item["processed_index"] for item in records] == list(range(5))
+        assert all(item["msac_status"] == "OFF" and item["msac_outliers"] == 0
+                   for item in records)
         assert any(item["active_features"] > 0 for item in records)
         assert any(set(current["active_track_ids"]) & set(previous["active_track_ids"])
                    for previous, current in zip(records, records[1:]))

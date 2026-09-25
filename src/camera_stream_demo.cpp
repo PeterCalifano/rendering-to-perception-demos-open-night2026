@@ -294,7 +294,8 @@ int main(int argc, char** argv)
                         if (!processor)
                         {
                             processor.emplace(frame->image.size(), options.mode, options.extraction,
-                                              options.centroid_model, options.yolo_model);
+                                              std::nullopt, options.centroid_model,
+                                              options.yolo_model);
                             const std::string source_kind = options.camera_index    ? "webcam"
                                                             : options.video.empty() ? "frames_dir"
                                                                                     : "video";

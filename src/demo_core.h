@@ -25,6 +25,9 @@ struct GLFWwindow;
 namespace demo
 {
 
+/** Pixel-domain tolerance for calibrated KLT geometric rejection. */
+inline constexpr double msac_max_distance_px = 1.0;
+
 class CModelAdapter;
 
 enum class EMode
@@ -78,6 +81,8 @@ struct SFrameSummary
     bool klt_enabled{false};
     std::string mask_status{"OFF"};
     bool extraction_retry{false};
+    std::string msac_status{"OFF"};
+    std::size_t msac_outliers{0}; ///< Tracks retired by an accepted geometric model.
     std::string centroid_status{"OFF"};
     std::optional<cv::Point2d> centroid_px;
     bool yolo_enabled{false};
@@ -166,7 +171,17 @@ template <typename T> class CLatestMailbox
 class CFrameProcessor
 {
   public:
+    /**
+     * @brief Own KLT and optional model inference for one fixed-resolution stream.
+     * @param image_size_px Source image dimensions.
+     * @param mode Enabled KLT/centroid pair.
+     * @param extraction KLT feature-eligibility policy.
+     * @param camera_intrinsics Matching pinhole calibration; enables MSAC when present.
+     * @param centroid_model Optional centroid model path.
+     * @param yolo_model Optional YOLOv7 model path.
+     */
     CFrameProcessor(cv::Size image_size_px, EMode mode, EKltExtraction extraction,
+                    std::optional<pyramid_klt::SCameraIntrinsics> camera_intrinsics = std::nullopt,
                     const std::filesystem::path& centroid_model = {},
                     const std::filesystem::path& yolo_model = {});
     ~CFrameProcessor();
