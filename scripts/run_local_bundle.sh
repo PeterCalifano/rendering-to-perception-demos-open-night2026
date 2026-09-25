@@ -10,10 +10,14 @@ fi
 program=$1
 shift
 
+binary_dir=${DEMO_BINARY_DIR:-$demo_root/external/bin}
+if [[ $binary_dir != /* ]]; then
+    binary_dir="$demo_root/$binary_dir"
+fi
 if [[ $program == render ]]; then
-    executable="$demo_root/external/bin/render_stream_demo"
+    executable="$binary_dir/render_stream_demo"
 else
-    executable="$demo_root/external/bin/camera_stream_demo"
+    executable="$binary_dir/camera_stream_demo"
 fi
 [[ -x $executable ]] || { printf 'Missing bundled executable: %s\n' "$executable" >&2; exit 1; }
 
@@ -28,6 +32,5 @@ bundle_library_path="$demo_root/external/native/lib:$demo_root/external/onnxrunt
 bundle_library_path+=":$demo_root/external/opencv/lib:$demo_root/external/cuda-runtime/lib"
 export LD_LIBRARY_PATH="$bundle_library_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export RENDERING_DATA="$demo_root/assets/rendering"
-export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-1}"
 cd "$demo_root"
 exec "$executable" "$@"

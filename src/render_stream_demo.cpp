@@ -410,25 +410,36 @@ spectra_rt::CScene MakeScene(const SOptions& options)
     return CSceneBuilder::buildScene(definition);
 }
 
-void VerifyGpuOne()
+struct SCudaDeviceInfo
 {
-    const char* visible_devices = std::getenv("CUDA_VISIBLE_DEVICES");
-    if (!visible_devices || std::string(visible_devices) != "1")
-        throw std::runtime_error("Set CUDA_VISIBLE_DEVICES=1 for the physical GPU 1");
+    int logical_index;
+    std::string name;
+    int compute_major;
+    int compute_minor;
+};
+
+SCudaDeviceInfo QueryCudaDevice()
+{
+    int logical_index = 0;
+    const auto selection_status = cudaGetDevice(&logical_index);
+    if (selection_status != cudaSuccess)
+        throw std::runtime_error(std::string("Cannot select a CUDA device: ") +
+                                 cudaGetErrorString(selection_status));
     cudaDeviceProp properties{};
-    if (cudaGetDeviceProperties(&properties, 0) != cudaSuccess)
-        throw std::runtime_error("Cannot inspect logical CUDA device 0");
-    const std::string name(properties.name);
-    if (name.find("4070 Ti") == std::string::npos)
-        throw std::runtime_error("Visible device is not the expected RTX 4070 Ti: " + name);
-    std::cout << "CUDA logical 0 = physical 1: " << name << '\n';
+    const auto properties_status = cudaGetDeviceProperties(&properties, logical_index);
+    if (properties_status != cudaSuccess)
+        throw std::runtime_error(std::string("Cannot inspect the CUDA device: ") +
+                                 cudaGetErrorString(properties_status));
+    std::cout << "CUDA logical " << logical_index << ": " << properties.name << " (compute "
+              << properties.major << '.' << properties.minor << ")\n";
+    return {logical_index, properties.name, properties.major, properties.minor};
 }
 
 void Render(const SOptions& options, SCameraControl& control,
             demo::CLatestMailbox<demo::SPreviewFrame>& outgoing, const std::atomic<bool>& stop)
 {
     using namespace spectra_rt;
-    VerifyGpuOne();
+    const auto cuda_device = QueryCudaDevice();
     auto sensor = CRendererConfigParser::ParseCamera(options.camera_yaml.string());
     const cv::Size image_size_px(sensor.camera.intrinsics.frameWidth_px,
                                  sensor.camera.intrinsics.frameHeight_px);
@@ -492,7 +503,7 @@ void Render(const SOptions& options, SCameraControl& control,
     const std::vector<SSceneInstanceConfig> body_instances{MakeBodyInstance(options)};
     const vec3f sun_direction = SunDirectionWorld();
     std::ostringstream metadata;
-    metadata << std::setprecision(10) << "{\"schema\":1,\"program\":\"render_stream_demo\""
+    metadata << std::setprecision(10) << "{\"schema\":2,\"program\":\"render_stream_demo\""
              << ",\"mode\":" << demo::JsonQuote(demo::ModeName(options.mode))
              << ",\"scene\":" << demo::JsonQuote(options.scene)
              << ",\"view\":" << demo::JsonQuote(options.view)
@@ -522,7 +533,11 @@ void Render(const SOptions& options, SCameraControl& control,
     metadata << ",\"centroid_model\":" << demo::JsonQuote(options.centroid_model.string())
              << ",\"width_px\":" << image_size_px.width << ",\"height_px\":" << image_size_px.height
              << ",\"preview_white_electrons\":" << sensor.film.fullWellCapacity
-             << ",\"spp\":" << options.spp << ",\"physical_gpu_index\":1,\"world_unit_m\":1000}";
+             << ",\"spp\":" << options.spp
+             << ",\"cuda_device\":{\"logical_index\":" << cuda_device.logical_index
+             << ",\"name\":" << demo::JsonQuote(cuda_device.name)
+             << ",\"compute_major\":" << cuda_device.compute_major
+             << ",\"compute_minor\":" << cuda_device.compute_minor << "},\"world_unit_m\":1000}";
     writer.writeRunMetadata(metadata.str());
     const auto stream_start = Clock::now();
 

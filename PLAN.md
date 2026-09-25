@@ -37,7 +37,7 @@ Before editing source, write this plan, start the goal, and record the current s
 
 - Require exactly one camera source: `--camera-index`, `--video`, or `--frames-dir`. Naturally sort folder images, reject inconsistent dimensions, pace file sources as streams, and drain processing at EOF. Keep source and processed indices distinct.
 - Use AutoForge's plain image-only centroid role with one image input and one `[1,2]` normalized output. Map to source pixels without silently clamping out-of-frame values. `centroid` and `both` require `DEMO_ENABLE_ML=ON` and `--centroid-model` or fail clearly at startup.
-- Decode YOLOv7 640 x 640 raw detections, filter by score, apply class-aware NMS, and map boxes to source pixels. Keep model weights external. Centroiding defaults to CPU; YOLO follows its manifest. CUDA inference uses physical GPU 1 under `CUDA_VISIBLE_DEVICES=1`.
+- Decode YOLOv7 640 x 640 raw detections, filter by score, apply class-aware NMS, and map boxes to source pixels. Keep model weights external. Centroiding defaults to CPU; YOLO follows its manifest. When selecting a GPU, use `CUDA_VISIBLE_DEVICES` for that run; the demo must not require a particular physical index or model name.
 
 ## Stages
 
@@ -109,13 +109,29 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Test relocated textured Bennu, copied CMake package rebuild, checksum manifest, and loader path evidence; record exact results in the handoff.
 - [x] Review scripts, documentation, copied payload, host prerequisites, and final diff; commit only demo-repo paths under the existing demo-only authorization. Do not push.
 
+### 8. Portable GPU selection and second-machine build (2026-09-25)
+
+- [x] Remove the hard-coded GPU 1/4070 Ti checks in both executables. Report the selected logical CUDA device and actual name; replace the false physical-index value in rendered `run.json` with device facts.
+- [x] Leave `CUDA_VISIBLE_DEVICES` unset by default in the bundle launcher and allow it to launch either copied or newly built executables with the copied library path.
+- [x] Rebuild on the local machine, select the 4070 Ti through `CUDA_VISIBLE_DEVICES=1`, and inspect the one-frame sphere output and `run.json` device facts.
+- [x] Transfer the changed source and launcher to `peterc-alien16x`, verify bundle checksums, rebuild with its CUDA 12.9 toolkit, and run bounded render and camera/model smokes on its compute-12.0 GPU.
+- [x] Review the five-file Spectra-RT scalar-texture diff and focused GPU 1 physical checks. The approved patch was committed and pushed as `fdf46db` before the later review-first instruction; all other dirty Spectra-RT files remain unstaged.
+- [x] Update the README and development handoff with the device contract and second-machine evidence. Review readability, formatting, tests, and the final diff before any staging.
+
+### 9. Reword demo history and review remaining changes (2026-09-25)
+
+- [x] Reword and re-sign all ten existing demo commits with `(Codex)` at the end of each title. Verify every message body and file tree against the original and preserve the dirty working tree.
+- [x] Review the GPU selection source, launcher, plan, README, and handoff for simplification, documentation accuracy, formatting, and test evidence; stage only an explicit demo-repo path batch.
+- [x] Obtain explicit authorization to replace the published demo history and sync `peterc-alien16x`; the user granted it on 2026-09-25.
+- [ ] Push the signed history with an exact lease, verify GitHub `main`, and sync the second machine from GitHub.
+
 ## Review, commit, and comment rules
 
 After every large stage, inspect the full candidate diff and external worktree statuses; check threading, allocations, error paths, public Doxygen, physical-unit names, comments, and readability. Run relevant builds/tests, `clang-format`, and `git diff --check`. Stage explicit paths, inspect the full index, and run `git diff --cached --check` before committing. Opus 5.5 is not exposed here; use a focused guideline-based review.
 
-Follow Spectra-RT's commit style in this demo repo only: imperative sentence-case subject around 50-70 characters, no final period, no `feat:`/`fix:`/`docs:` prefix; `[MAJOR]` for significant capability, `[BUGFIX]` for correctness, `[HOTFIX]` for urgent narrow repair, no tag for routine work. Optional body bullets start with imperative verbs, have blank lines between them, and have no terminal periods. Describe behavior and consequence rather than file inventories. Add no AI attribution or `Co-Authored-By`. Run a no-ai-slop wording pass before each commit.
+Follow Spectra-RT's commit style in this demo repo only: imperative sentence-case subject around 50-70 characters, no final period, no `feat:`/`fix:`/`docs:` prefix; `[MAJOR]` for significant capability, `[BUGFIX]` for correctness, `[HOTFIX]` for urgent narrow repair, no tag for routine work. Optional body bullets start with imperative verbs, have blank lines between them, and have no terminal periods. Describe behavior and consequence rather than file inventories. The user explicitly requested `(Codex)` at the end of each existing title; add no authorship trailers or `Co-Authored-By`. Run a no-ai-slop wording pass before each commit.
 
-The source batch used `[MAJOR] Stream renderer and camera frames through perception`; its optional body names the KLT streams, model overlays, and Bennu rotation. The documentation and patch artifact use a separate plain imperative subject. Use no automatic attribution trailers.
+The source batch used `[MAJOR] Stream renderer and camera frames through perception (Codex)`; its optional body names the KLT streams, model overlays, and Bennu rotation. The documentation and patch artifact use a separate plain imperative subject. Use no automatic attribution trailers.
 
 Example rendered-KLT body:
 
@@ -129,7 +145,7 @@ Example rendered-KLT body:
 
 Write brief imperative code comments for non-obvious steps and invariants, such as “Keep raw electrons unchanged before display scaling” and “Publish only after both results belong to this frame”. Group code by purpose; do not narrate obvious statements. Document public APIs with Doxygen.
 
-Stop for critical changes to the physical sensor, factorized path, KLT ownership, two-program design, or Bennu interpretation. Stop before any further external-repo source edit. The approved scalar-texture edit is applied but unstaged in Spectra-RT. Ordinary demo-repo fixes may proceed; model-specific blockers may be deferred as stated above. Commit only in this repo and never push. The later commit authorization covers the demo repo only.
+Stop for critical changes to the physical sensor, factorized path, KLT ownership, two-program design, or Bennu interpretation. Stop before any further external-repo source edit. The approved scalar-texture edit is commit `fdf46db` in Spectra-RT; the remaining wrapper and quick-preview edits are separate. Ordinary demo-repo fixes may proceed; model-specific blockers may be deferred as stated above. Commit only in this repo and never push. The later commit authorization covered the demo repo only.
 
 ## Baseline at plan start (2026-09-24)
 
@@ -183,10 +199,10 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 
 ### Commits
 
-- `f5b6150` `[MAJOR] Stream renderer and camera frames through perception`: staged 14 explicit source/config/test paths, reviewed the complete index, passed `git diff --cached --check`, and committed only this repo. The source programs share CMake and `demo_core`, so their functioning integration formed one cohesive source batch; the plan and operating instructions follow separately.
-- `38cf534` `Document demo operation and prepare scalar-albedo patch`: staged only `.gitattributes`, this plan, README, and the then-unapplied patch; reviewed their complete diff and passed `git diff --cached --check`. The path-specific attribute excludes inherent unified-diff context spaces from that whitespace check. At the time, the patch passed `git apply --check` at Spectra-RT `f948bd6`.
+- `bba4026` `[MAJOR] Stream renderer and camera frames through perception (Codex)`: staged 14 explicit source/config/test paths, reviewed the complete index, passed `git diff --cached --check`, and committed only this repo. The source programs share CMake and `demo_core`, so their functioning integration formed one cohesive source batch; the plan and operating instructions follow separately.
+- `dac1c9a` `Document demo operation and prepare scalar-albedo patch (Codex)`: staged only `.gitattributes`, this plan, README, and the then-unapplied patch; reviewed their complete diff and passed `git diff --cached --check`. The path-specific attribute excludes inherent unified-diff context spaces from that whitespace check. At the time, the patch passed `git apply --check` at Spectra-RT `f948bd6`.
 - The earlier plan-ledger commit marked the completed local review and kept physical webcam, physical input-event, and textured-Bennu checks unchecked. Textured-Bennu checks were completed after the external edit was approved; the physical-device checks remain open.
-- `0da0841` `[BUGFIX] Use spacecraft-measured Bennu rotation period`: replaced the older radar period with the OSIRIS-REx 2018 spacecraft measurement, rebuilt ML and no-ML variants, reran CTest, regenerated the GPU 1 phase-sweep clip, and reviewed the three-file staged diff.
+- `6fdada5` `[BUGFIX] Use spacecraft-measured Bennu rotation period (Codex)`: replaced the older radar period with the OSIRIS-REx 2018 spacecraft measurement, rebuilt ML and no-ML variants, reran CTest, regenerated the GPU 1 phase-sweep clip, and reviewed the three-file staged diff.
 
 ### Requested rotation and phase-angle extension
 
@@ -203,5 +219,13 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 - `build/evidence_bennu_phase_sweep_msac`: 50 untextured Bennu frames at 8 spp with KLT and centroiding, camera azimuth 45 degrees, three-degree orbit steps, and 250x body spin. On GPU 1, phase rose from 11.976712 to 145.126152 degrees. MSAC was `WAIT` on the first frame and `VALID` on 49 transitions, retiring 1,453 correspondences in total; 30 active tracks remained at the final crescent. Centroid was `OK` for all 50 frames; zero frames dropped. Inspected the final annotated PNG. `build/evidence_bennu_phase_sweep_msac.mp4` is H.264, 2048 x 1536, 50 frames, 8.33 seconds at chosen 6 fps playback, SHA-256 `39659398fe8f130007bc04f26992a85b4b2b69e13aed8508dd90e24fdd48b5e8`. These are MSAC model rejections, not labeled false matches; the moving body may also violate rigid static-scene assumptions.
 - Rebuilt the ML and no-ML demo variants after the final calibration check. `camera_stream_contract` passed and confirmed `MSAC OFF` for uncalibrated file input. Reviewed the source and documentation diffs, formatting, patch reversibility, output JSON, clip probe, and unstaged worktree boundaries. At the original September 25 handoff, this work had made no new commit, stage, or push.
 - During the final worktree check, additional unstaged Spectra-RT edits appeared in `src/core/CSpectralRaytracer.h`, `src/core/CSpectralRaytracerWrapper.cpp`, `src/spectra_rt.i`, and `tests/core/testRayTracerConfig.cpp`. They are outside this patch and were left untouched. The original GPU tests and rendered evidence above predate those edits; the later focused GPU reruns check the two named suites in their presence, not the unrelated wrapper behavior.
-- The later demo-only authorization produced `1a75f6b` `[MAJOR] Reject geometric outliers in rendered KLT streams` from the five source/test paths. The ML and no-ML builds, CTest, final source diff, and `git diff --cached --check` passed before that commit. Rebuilt the Spectra-RT focused test targets and reran both GPU 1 suites afterward: 1,379 factorized assertions and 386 material assertions passed. The patch artifact exactly matched the five owned Spectra-RT diffs. The documentation and patch artifact formed a separate demo commit; all Spectra-RT edits remain unstaged and uncommitted.
-- `8d39e63` `Document calibrated KLT filtering and scalar texture checks` committed only this plan, README, and the patch artifact after full staged-diff review and `git diff --cached --check`. The user confirmed demo-only commits. The Spectra-RT index remained empty, and no push was made.
+- The later demo-only authorization produced `227d931` `[MAJOR] Reject geometric outliers in rendered KLT streams (Codex)` from the five source/test paths. The ML and no-ML builds, CTest, final source diff, and `git diff --cached --check` passed before that commit. Rebuilt the Spectra-RT focused test targets and reran both GPU 1 suites afterward: 1,379 factorized assertions and 386 material assertions passed. The patch artifact exactly matched the five owned Spectra-RT diffs. The documentation and patch artifact formed a separate demo commit; at that handoff the Spectra-RT edits were still unstaged and uncommitted.
+- `3d89fca` `Document calibrated KLT filtering and scalar texture checks (Codex)` committed only this plan, README, and the patch artifact after full staged-diff review and `git diff --cached --check`. The user confirmed demo-only commits. The Spectra-RT index was empty at that handoff; the later scalar-texture commit is recorded in Stage 8.
+
+### GPU selection and second-machine evidence
+
+- On the local RTX 4070 Ti SUPER, `CUDA_VISIBLE_DEVICES=1 DEMO_BINARY_DIR=build/demo scripts/run_local_bundle.sh render --scene sphere --spp 1 --max-frames 1 --headless --output-dir build/device_contract_local` completed. `run.json` reports logical device 0, compute 8.9, and the selected GPU name. The local camera contract CTest passed.
+- On `peterc-alien16x`, the bundle checksum passed and `build/portable` rebuilt with the transferred source. The launcher ran one headless sphere frame on the RTX 5070 Laptop GPU. Rendered `run.json` uses schema version 2 and reports logical device 0 and compute 12.0; the summary reports 150 active KLT features.
+- The same target used that annotated frame as a frame-folder input for a bounded camera smoke. KLT reported 149 active features, centroiding reported `OK`, and YOLO reported one box. Backend diagnostics reported CPU centroid and CUDA/CPU YOLO providers. The annotated input does not measure model accuracy.
+- Refreshed the two ignored `external/bin` executables and regenerated `external/BUNDLE.sha256`; only their two checksum rows changed. The target checksum passed after transfer. The default launcher, without `DEMO_BINARY_DIR`, then ran both the sphere and camera/model smokes on the RTX 5070 Laptop GPU.
+- The ten demo commit subjects were reworded and re-signed on both local checkouts. Each rewritten commit has the same file tree and message body as its original; the dirty working-tree diff hash remained unchanged on both machines. A temporary allowed-signers file verified all ten signatures on `peterc-alien16x`. Both `origin/main` refs still point to the original history.

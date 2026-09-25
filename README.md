@@ -10,8 +10,8 @@ Run `scripts/package_local_bundle.sh` after the ML-enabled build below. It creat
 ignored `external/` with the executables and installed native, OpenCV, ONNX,
 CUDA user-space, and OptiX files, plus ignored `assets/` with Bennu and both
 models. Copy the entire folder, including those ignored directories; cloning
-Git alone does not copy them. On a matching Ubuntu x86-64 host with a compatible
-NVIDIA driver and physical GPU 1 as the RTX 4070 Ti, run:
+Git alone does not copy them. On a compatible Ubuntu x86-64 host with an NVIDIA
+driver and CUDA GPU, run:
 
 ```sh
 sha256sum -c external/BUNDLE.sha256
@@ -27,15 +27,22 @@ Use `scripts/run_local_bundle.sh camera` for webcam, video, and folder sources;
 pass the bundled centroid model and YOLO manifest paths shown in the
 [handoff](doc/developments/2026-09-25_portability_and_implementation_handoff.md#local-copy-bundle).
 The launcher selects copied libraries ahead of the executables' absolute
-RUNPATH and sets the Bennu data root. The host still supplies its driver,
-glibc, display stack, and codecs. A different GPU layout needs the guard and
-run metadata updated, followed by a rebuild and repackage.
+RUNPATH and sets the Bennu data root. It leaves CUDA device selection to the
+caller; set `CUDA_VISIBLE_DEVICES` when the host has multiple GPUs. Set
+`DEMO_BINARY_DIR=build/portable` to run a rebuilt executable with the copied
+libraries. The host still supplies its driver, glibc, display stack, and codecs.
+The copied Spectra-RT binary must also support the destination GPU.
+Rendered `run.json` uses schema version 2 and records the selected logical CUDA
+index, GPU name, and compute capability under `cuda_device`.
 
 This repo retains only the MIT license from `cpp_cuda_template_project` commit `f207d2a`; it contains no ROS overlay, wrapper, CUDA placeholder, or template-conformance suite.
 
 ## Build
 
-These commands use the checkouts and packages on this machine. Dependencies install into this repo's ignored `deps/` directory. Builds use OpenCV 4.10 from `/usr/local`.
+These commands use the checkouts and packages on this machine. Dependencies
+install into this repo's ignored `deps/` directory. Builds use OpenCV 4.10
+from `/usr/local`. The Spectra-RT architecture value `89` targets the local
+RTX 4070 Ti; select the destination architecture if rebuilding that library.
 
 ```sh
 cd /home/peterc/devDir/rendering-to-perception-demos-open-night2026
@@ -130,7 +137,17 @@ The MP4 playback rate is an encoding choice, not a measured online frame rate. C
 
 The overlay uses up to eight recent positions per surviving KLT ID. Old positions are red, the middle is orange, and the current point is yellow. This bounded cache is for drawing only; KLT owns the IDs and track lifetime. Rendered KLT uses the frontend's essential-matrix MSAC rejection with the centered WFOV pinhole geometry (`fx = fy = 5840.9 px`, `cx = 1024 px`, `cy = 768 px`) and `msac_max_distance = 1.0 px`. A valid model retires rejected IDs before drawing; `WAIT` or `FAIL` performs no geometric rejection. Camera, video, and folder streams leave MSAC off because their calibration is unknown. At large phase angles, the lit surface narrows and surviving tracks near the terminator still need independent geometric validation.
 
-The optional `--albedo-jpeg FILE` path decodes a grayscale or BGR JPEG, converts sRGB to linear luminance, quantizes one channel, and multiplies the nominal 0.05 Lambertian coefficient by that scalar map. Spectra-RT's CUDA upload replicates the one channel without sRGB conversion, so its factorized transport remains wavelength independent. This map and coefficient are demonstration inputs, not calibrated Bennu reflectance. [The Spectra-RT patch](patches/0001-admit-scalar-albedo-in-factorized-transport.patch) targets `feature/implement-factorized-radiometry-mode` at `f948bd6`. It is applied but unstaged and uncommitted in that checkout for this run; the patch file is tracked in this demo repo. On a clean copy of that revision, apply it once before building:
+The optional `--albedo-jpeg FILE` path decodes a grayscale or BGR JPEG,
+converts sRGB to linear luminance, and quantizes one channel. That scalar map
+multiplies the nominal 0.05 Lambertian coefficient. Spectra-RT's CUDA upload
+replicates the channel without sRGB conversion, preserving wavelength-independent
+factorized transport. The map and coefficient are demonstration inputs, not
+calibrated Bennu reflectance.
+
+The scalar-texture change is commit `fdf46db` on Spectra-RT's
+`feature/implement-factorized-radiometry-mode` branch. [The patch artifact](patches/0001-admit-scalar-albedo-in-factorized-transport.patch)
+reproduces that change from the older `f948bd6` revision. Apply it only to a
+clean checkout of that older revision:
 
 ```sh
 git -C /home/peterc/devDir/rendering-sw/spectra-rt apply \

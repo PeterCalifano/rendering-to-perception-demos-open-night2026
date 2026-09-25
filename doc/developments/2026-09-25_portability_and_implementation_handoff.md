@@ -1,8 +1,9 @@
 # Rendering-to-perception demo: portability and implementation handoff
 
-Snapshot: 2026-09-25. Demo repository: main at 438b2f0 before the local bundle
-update. This report describes the working installation on Ubuntu 24.04 and the
-files needed to reproduce it elsewhere.
+Snapshot: 2026-09-25. This report describes the working installation on Ubuntu
+24.04 and the files needed to reproduce it elsewhere. The ten existing demo
+commit titles were reworded and re-signed in both local checkouts; their file
+trees did not change. Both GitHub-tracking refs still point to the old history.
 Read [AGENTS.md](../../AGENTS.md), [PLAN.md](../../PLAN.md), and
 [README.md](../../README.md) before changing code. The ignored `external/` and
 `assets/` directories are now the copied runtime bundle; a Git clone alone does
@@ -45,7 +46,7 @@ rsync -a --exclude=.git --exclude=/build --exclude=/deps --exclude=/output \
   /home/peterc/devDir/rendering-to-perception-demos-open-night2026/ \
   /path/on/new-machine/rendering-to-perception-demos-open-night2026/
 cd /path/on/new-machine/rendering-to-perception-demos-open-night2026
-CUDA_VISIBLE_DEVICES=1 scripts/run_local_bundle.sh render \
+scripts/run_local_bundle.sh render \
   --scene sphere --mode both \
   --centroid-model "$PWD/assets/models/centroid/best_model_plain_traveling-goat-68_22b61bbd4ddd.onnx" \
   --spp 1 --max-frames 1 --headless
@@ -53,8 +54,10 @@ CUDA_VISIBLE_DEVICES=1 scripts/run_local_bundle.sh render \
 
 The launcher changes to the demo root so the tracked camera YAML resolves,
 sets `RENDERING_DATA` to the copied Bennu root, and puts bundled shared
-libraries ahead of the binaries' original absolute RUNPATH entries. It defaults
-`CUDA_VISIBLE_DEVICES` to 1. Use `scripts/run_local_bundle.sh camera` with the
+libraries ahead of the binaries' original absolute RUNPATH entries. It leaves
+`CUDA_VISIBLE_DEVICES` unchanged; set it explicitly when selecting a GPU. Set
+`DEMO_BINARY_DIR=build/portable` to run a rebuilt executable from the copied
+packages. Use `scripts/run_local_bundle.sh camera` with the
 same camera options as the ordinary executable. For a video with all three
 processors:
 
@@ -78,12 +81,12 @@ For textured Bennu, add:
 ```
 
 This runtime copy needs a compatible Ubuntu 24.04 x86-64 host with an NVIDIA
-driver and physical GPU 1 matching the current 4070 Ti guard.
+driver and a CUDA GPU supported by the copied native libraries.
 The OS loader, glibc, libstdc++, X11/GLFW/OpenGL, codecs, and the NVIDIA driver
-remain host components. Headless use does not require a display. For a new GPU
-layout, update the guard and `physical_gpu_index` as described below, rebuild,
-and repackage; setting a different `CUDA_VISIBLE_DEVICES` value alone cannot
-pass the present guard. The copied prefixes can be used to rebuild the demo,
+remain host components. Headless use does not require a display. The renderer
+queries the selected logical CUDA device and records its name and compute
+capability in `run.json`; it does not infer a physical index. The copied
+prefixes can be used to rebuild the demo,
 but that still requires a C++20 compiler, CMake, Eigen 3.4, CUDA toolkit 12.9,
 OptiX headers, and the host development packages. The bundle does not contain
 the KLT/SLAM source worktrees required to rebuild those libraries from source.
@@ -117,11 +120,10 @@ cmake --build "$demo_root/build/portable" -j 8
       `external/BUNDLE.sha256` after transfer.
 - [ ] On the destination, run the bundled sphere+centroid smoke, then a camera
       video/folder smoke, then textured Bennu and YOLO as needed.
-- [ ] For a dependency source rebuild, copy or recreate the matching
-      Spectra-RT checkout. For a clean checkout use
-      branch feature/implement-factorized-radiometry-mode at f948bd6 and apply the
-      patch in this repository once. Do not carry unrelated Spectra-RT edits into
-      that patch.
+- [ ] For a dependency source rebuild, use Spectra-RT branch
+      feature/implement-factorized-radiometry-mode at fdf46db. The tracked patch
+      in this demo repo is for the older f948bd6 revision only; do not apply it
+      again to a checkout that already contains the change.
 - [ ] For a dependency source rebuild, copy the exact working trees of
       pyramidal-klt-for-space-nav and
       slam-primitives, including uncommitted and untracked source files. Their
@@ -143,8 +145,8 @@ cmake --build "$demo_root/build/portable" -j 8
 
 | Component | Source used here | Transfer rule |
 | --- | --- | --- |
-| Demo | main, 438b2f0 before bundle work | Copy the complete working folder, including ignored external/ and assets/. Git alone does not carry the payload. |
-| Spectra-RT | feature/implement-factorized-radiometry-mode, f948bd6 | The runtime bundle contains its install. For a source rebuild, clone this revision and apply the tracked patch. Keep unrelated local edits separate. |
+| Demo | main, 72575a2 before current portability edits | Copy the complete working folder, including ignored external/ and assets/. Git alone does not carry the payload. |
+| Spectra-RT | feature/implement-factorized-radiometry-mode, fdf46db | The runtime bundle contains its install. For a source rebuild, use this commit. The tracked patch is only for the older f948bd6 revision. Keep unrelated local edits separate. |
 | KLT | feature/space-tailored-extraction, c714e1f | The runtime bundle contains its install. For a source rebuild, copy the working tree with its 28 modified paths or export those changes separately. |
 | SLAM primitives | feature/extend-visual-features-support, 5e54f81 | The runtime bundle contains its install. For a source rebuild, copy the working tree with its 42 status entries, including untracked strong-ID and camera-type headers. |
 | AutoForge deploy | develop, 03bb25c | The runtime bundle contains its install. Source is needed only when rebuilding that library; the current local edit is documentation only. |
@@ -176,10 +178,9 @@ respectively; the latter hash does not include untracked files.
 
 The Spectra-RT patch file has SHA-256
 1292775b604623200620b3f43f95165a629d518f2bc4b7b143dfe53701cfe4e3.
-It applies to the clean f948bd6 index and exactly matches the five
-demo-owned Spectra-RT changes in the current working tree. Those changes remain
-unstaged and uncommitted there. The unrelated quick-demo script and later
-wrapper/config edits belong to other work and must be preserved separately.
+It applies to the clean f948bd6 index and matches the five files later
+committed as fdf46db. The unrelated quick-demo script and wrapper/config edits
+remain separate working-tree changes and must be preserved separately.
 The local Spectra-RT checkout has MathCore_for_ComputerVision, OWL,
 meshoptimizer, and wrap gitlinks. Reproduce the dependency submodule
 revisions needed by its native build; Python wrapper generation is not part
@@ -220,8 +221,8 @@ frames.jsonl, and 50 annotated PNGs. Both paths are ignored by Git.
 | --- | --- | --- |
 | OS and compiler | Ubuntu 24.04.4 x86-64, GCC 13.3, C++20 | The native stack was built here. Other platforms are untested. |
 | CMake and generator | CMake 3.28.3, Ninja 1.11.1 | Spectra-RT requires CMake 3.28 or newer with GCC 13. |
-| CUDA and driver | CUDA toolkit 12.9, driver 580.105.08 | Spectra-RT uses CUDA and OptiX. The tested GPU architecture is 89. |
-| GPU | Physical index 1: RTX 4070 Ti SUPER, compute 8.9, 16 GiB | The renderer enforces this exact device selection and checks that its name contains 4070 Ti. |
+| CUDA and driver | CUDA toolkit 12.9, local driver 580.105.08 | Spectra-RT uses CUDA and OptiX. Runtime smokes passed on compute 8.9 and 12.0 GPUs. |
+| GPU | Local: physical index 1, RTX 4070 Ti SUPER, compute 8.9; target: RTX 5070 Laptop GPU, compute 12.0 | The renderer queries the selected logical device. The copied native libraries must support its architecture. |
 | OptiX | SDK 9 headers and compatible driver | Required by Spectra-RT; point OPTIX_ROOT to the SDK root. |
 | OpenCV | CMake package 4.10.0 from /usr/local, Python cv2 4.10.0-dev | The demo requests OpenCV 4.10. The system pkg-config default here reports 4.6.0, so set OpenCV_DIR explicitly. |
 | Eigen | 3.4.0 | Required by KLT, SLAM primitives, and AutoForge. |
@@ -381,12 +382,10 @@ illuminated-body mask; space is the default.
       --yolo-model /path/to/examples/model_configs/yolov7_640x640.ptafmodel \
       --headless --output-dir build/video_all
 
-The current camera executable requires the literal CUDA_VISIBLE_DEVICES=1
-when --yolo-model is given, even though the YOLO manifest allows CPU fallback.
-The manifest asks ONNX Runtime for CUDA then CPU and selects logical device
-zero, which is physical GPU 1 after CUDA_VISIBLE_DEVICES=1. Centroiding
-requests the CPU provider. File and webcam KLT have no calibration, so MSAC
-status remains OFF.
+The camera executable accepts the device visibility selected by the caller.
+The YOLO manifest asks ONNX Runtime for CUDA then CPU and selects logical device
+zero among visible devices. Centroiding requests the CPU provider. File and
+webcam KLT have no calibration, so MSAC status remains OFF.
 
 With no --headless flag, GLFW opens the preview. Left-drag orbits the rendered
 camera, right-drag pans, wheel changes distance, arrows pan in the camera
@@ -401,7 +400,7 @@ step, not an online frame-rate measurement.
 | File | Owner and main contract |
 | --- | --- |
 | [CMakeLists.txt](../../CMakeLists.txt) | Always link Spectra-RT, KLT, OpenCV, GLFW, and OpenGL. Gate AutoForge/ONNX code with DEMO_ENABLE_ML; gate the Python behavior test with DEMO_BUILD_TESTS. |
-| [render_stream_demo.cpp](../../src/render_stream_demo.cpp) | Parse render options, create sphere/Bennu and fixed Sun, configure factorized physical sensor, update camera/body, read Bayer electrons, reconstruct fixed-scale grayscale, pass the calibrated frame to the shared processor. Enforce GPU 1 and write run metadata. |
+| [render_stream_demo.cpp](../../src/render_stream_demo.cpp) | Parse render options, create sphere/Bennu and fixed Sun, configure factorized physical sensor, update camera/body, read Bayer electrons, reconstruct fixed-scale grayscale, pass the calibrated frame to the shared processor. Query the selected CUDA device and write run metadata. |
 | [camera_stream_demo.cpp](../../src/camera_stream_demo.cpp) | Capture webcam/video/folder frames, pace files, retain source indices, drain at EOF, use one-slot capture and preview mailboxes, and pass unknown calibration explicitly. |
 | [demo_core.h](../../src/demo_core.h) and [demo_core.cpp](../../src/demo_core.cpp) | Own the frontend KLT pipeline, optional model adapter, eight-position display trails, per-frame summary, JSONL/PNG writer, and GLFW preview. This is the shared frame ownership boundary. |
 | [model_adapter.cpp](../../src/model_adapter.cpp) | Bind centroid ONNX to CPU and YOLO manifest to its declared backend; normalize inputs, decode the 1x2 centroid, decode YOLO raw rows, apply score filtering and class-aware NMS. |
@@ -449,9 +448,11 @@ processed indices may differ when work falls behind. Console text,
 overlay, and frames.jsonl come from one SFrameSummary. With
 --output-dir, CFrameWriter creates run.json, frames.jsonl, and
 frames/frame_000000.png-style annotated images. Without that flag,
-interactive runs do not write output. The JSON schema is version 1. Rendered
-run.json records the camera pixels, MSAC threshold, physical GPU index, scene,
-and spin settings. Each frames.jsonl row carries source_index and
+interactive runs do not write output. Rendered run.json uses schema version 2
+because `cuda_device` replaces the former `physical_gpu_index` field; camera
+run.json remains version 1. Rendered metadata records camera pixels, MSAC
+threshold, selected CUDA device facts, scene, and spin settings. Each
+frames.jsonl row carries source_index and
 processed_index, active_track_ids, KLT/mask/MSAC and centroid states, stage
 times, and optional phase/spin values. Read these structured fields instead
 of parsing the overlay text.
@@ -492,6 +493,24 @@ of parsing the overlay text.
   Bennu KLT and centroiding (150 active IDs, centroid OK). All three used
   physical GPU 1. This was path relocation on the same host, not a test on a
   second machine.
+- On `peterc-alien16x`, `sha256sum -c --quiet external/BUNDLE.sha256` passed.
+  The transferred source rebuilt in `build/portable` with the
+  target's CUDA 12.9 toolkit. `DEMO_BINARY_DIR=build/portable` ran one headless
+  sphere frame through the launcher on its RTX 5070 Laptop GPU. `run.json`
+  reports CUDA logical device 0 and compute 12.0; KLT reported 150 active IDs.
+  A frame-folder camera smoke using that annotated PNG reported 149 KLT IDs,
+  centroid `OK`, and one YOLO box. The model diagnostics reported CPU centroid
+  and CUDA/CPU YOLO providers. The annotated input does not measure detection
+  accuracy. A physical webcam was not available for this test.
+- The two ignored `external/bin` executables were refreshed from the local
+  build, and only their two rows changed in `external/BUNDLE.sha256`. After
+  transfer, the target checksum passed again. The default launcher then ran
+  one sphere frame and one camera frame-folder KLT+centroid+YOLO frame on the
+  RTX 5070 Laptop GPU without `DEMO_BINARY_DIR` or `CUDA_VISIBLE_DEVICES`.
+- The target imported the reworded commit history through a Git bundle and
+  moved only its local `main`. Its tracked working-tree diff hash remained
+  unchanged. All ten SSH signatures verified there with a temporary copy of
+  the source machine's allowed-signers file; no permanent Git config changed.
 - CMake configured and rebuilt both demos from the second path against the
   copied installed packages. Its first configure exposed a missing OpenCV
   `lib/opencv4/3rdparty` directory; the packager now includes it. With the
@@ -535,21 +554,19 @@ validation.
    The KLT and SLAM working trees are intentionally dirty; preserve
    their uncommitted source. Stage only reviewed demo paths and do not
    push without a new user instruction.
-2. For a new GPU layout, update VerifyGpuOne in
-   [render_stream_demo.cpp](../../src/render_stream_demo.cpp), the YOLO
-   CUDA_VISIBLE_DEVICES check in
-   [camera_stream_demo.cpp](../../src/camera_stream_demo.cpp), and the
-   physical_gpu_index run metadata together. Set Spectra-RT's CUDA
-   architecture for the actual GPU, then rerun a GPU smoke. Merely
-   changing the environment variable is insufficient today.
+2. For a new GPU, select visibility with `CUDA_VISIBLE_DEVICES` if needed and
+   run a bounded smoke through `scripts/run_local_bundle.sh`. The renderer's
+   `cuda_device` metadata reports the selected logical device, name, and compute
+   capability. If the copied Spectra-RT build cannot run on that GPU, rebuild
+   Spectra-RT for its CUDA architecture before repeating the smoke.
 3. For another camera, make the traced-ray model and KLT intrinsics
    agree before enabling MSAC. Change camera YAML parsing/validation in
    the owning renderer if needed, and test off-center or distortion
    behavior explicitly. Do not silently reuse the current centered
    WFOV intrinsics.
 4. For source integration or renderer material behavior, keep code in
-   its owning repository. The current Spectra-RT texture patch is a
-   reviewed external change but remains unstaged there. A further
+   its owning repository. The scalar-texture admission change is now commit
+   `fdf46db` on Spectra-RT's factorized-radiometry branch. A further
    external-source edit is a review gate under this demo's
    [AGENTS.md](../../AGENTS.md) and [PLAN.md](../../PLAN.md).
 5. For stream threading, frame identity, and output format, edit the
@@ -563,7 +580,6 @@ validation.
    requested, follow the imperative sentence-case style in PLAN.md,
    inspect the complete staged index, and keep external work excluded.
 
-The present code has two specific portability gaps: the literal
-GPU-1/4070-Ti guard and the uncommitted KLT/SLAM dependency state.
-Address those deliberately before describing the repository as
-self-contained or broadly portable.
+The installed KLT/SLAM dependency state is copied into `external/`, but its
+uncommitted source worktrees are not. Rebuild those libraries from source only
+after securing their reviewed source snapshots.

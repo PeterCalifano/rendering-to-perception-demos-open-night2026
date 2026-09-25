@@ -118,12 +118,6 @@ SOptions ParseOptions(int argc, char** argv)
     if (options.mode != demo::EMode::Klt || !options.yolo_model.empty())
         throw std::invalid_argument("Models require DEMO_ENABLE_ML=ON");
 #endif
-    if (!options.yolo_model.empty())
-    {
-        const char* visible_devices = std::getenv("CUDA_VISIBLE_DEVICES");
-        if (!visible_devices || std::string(visible_devices) != "1")
-            throw std::invalid_argument("YOLO CUDA execution requires CUDA_VISIBLE_DEVICES=1");
-    }
     return options;
 }
 
