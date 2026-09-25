@@ -2,6 +2,8 @@
 
 Two C++20 programs use the same frame processor. `render_stream_demo` renders a Bayer sensor frame with Spectra-RT, reconstructs fixed-scale grayscale, and runs space-aware KLT, centroiding, or both. `camera_stream_demo` accepts a webcam, video, or image folder and can also run YOLOv7. Each processed frame gets colored overlays, a compact preview summary, one console line, and optional JSONL and PNG output. The stage record and measured checks are in [PLAN.md](PLAN.md).
 
+For another machine, use the [copy checklist and implementation handoff](doc/developments/2026-09-25_portability_and_implementation_handoff.md). It records external source snapshots, asset and model hashes, rebuild order, GPU assumptions, and the code ownership map.
+
 This repo retains only the MIT license from `cpp_cuda_template_project` commit `f207d2a`; it contains no ROS overlay, wrapper, CUDA placeholder, or template-conformance suite.
 
 ## Build
