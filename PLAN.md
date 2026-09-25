@@ -123,7 +123,7 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Reword and re-sign all ten existing demo commits with `(Codex)` at the end of each title. Verify every message body and file tree against the original and preserve the dirty working tree.
 - [x] Review the GPU selection source, launcher, plan, README, and handoff for simplification, documentation accuracy, formatting, and test evidence; stage only an explicit demo-repo path batch.
 - [x] Obtain explicit authorization to replace the published demo history and sync `peterc-alien16x`; the user granted it on 2026-09-25.
-- [ ] Push the signed history with an exact lease, verify GitHub `main`, and sync the second machine from GitHub.
+- [x] Push the signed history with an exact lease, verify GitHub `main`, and sync the second machine from GitHub.
 
 ## Review, commit, and comment rules
 
@@ -228,4 +228,5 @@ This plan is `/home/peterc/devDir/rendering-to-perception-demos-open-night2026/P
 - On `peterc-alien16x`, the bundle checksum passed and `build/portable` rebuilt with the transferred source. The launcher ran one headless sphere frame on the RTX 5070 Laptop GPU. Rendered `run.json` uses schema version 2 and reports logical device 0 and compute 12.0; the summary reports 150 active KLT features.
 - The same target used that annotated frame as a frame-folder input for a bounded camera smoke. KLT reported 149 active features, centroiding reported `OK`, and YOLO reported one box. Backend diagnostics reported CPU centroid and CUDA/CPU YOLO providers. The annotated input does not measure model accuracy.
 - Refreshed the two ignored `external/bin` executables and regenerated `external/BUNDLE.sha256`; only their two checksum rows changed. The target checksum passed after transfer. The default launcher, without `DEMO_BINARY_DIR`, then ran both the sphere and camera/model smokes on the RTX 5070 Laptop GPU.
-- The ten demo commit subjects were reworded and re-signed on both local checkouts. Each rewritten commit has the same file tree and message body as its original; the dirty working-tree diff hash remained unchanged on both machines. A temporary allowed-signers file verified all ten signatures on `peterc-alien16x`. Both `origin/main` refs still point to the original history.
+- The ten demo commit subjects were reworded and re-signed on both local checkouts. Each rewritten commit has the same file tree and message body as its original; the dirty working-tree diff hash remained unchanged on both machines. A temporary allowed-signers file verified all ten signatures on `peterc-alien16x`.
+- The user authorized the demo push. An exact-lease update replaced GitHub `main` at `2f06155` with `ae31265`, including the reviewed portability commit. The second machine fetched that published history, matched its working files to the new tree, advanced `main` without discarding files, and passed the bundle checksum with a clean tracked tree.

@@ -3,7 +3,7 @@
 Snapshot: 2026-09-25. This report describes the working installation on Ubuntu
 24.04 and the files needed to reproduce it elsewhere. The ten existing demo
 commit titles were reworded and re-signed in both local checkouts; their file
-trees did not change. Both GitHub-tracking refs still point to the old history.
+trees did not change. GitHub `main` now carries the reworded history.
 Read [AGENTS.md](../../AGENTS.md), [PLAN.md](../../PLAN.md), and
 [README.md](../../README.md) before changing code. The ignored `external/` and
 `assets/` directories are now the copied runtime bundle; a Git clone alone does
