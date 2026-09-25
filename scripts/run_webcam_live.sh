@@ -9,6 +9,5 @@ camera_index=${CAMERA_INDEX:-0}
 
 exec "$demo_root/scripts/run_local_bundle.sh" camera \
     --camera-index "$camera_index" --mode both --klt-extraction generic \
-    --centroid-model "$demo_root/assets/models/centroid/best_model_plain_traveling-goat-68_22b61bbd4ddd.onnx" \
     --yolo-model "$demo_root/assets/models/yolo/examples/model_configs/yolov7_640x640.ptafmodel" \
     "$@"
