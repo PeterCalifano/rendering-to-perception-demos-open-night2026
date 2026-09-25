@@ -15,13 +15,13 @@ Run [package_local_bundle.sh](../../scripts/package_local_bundle.sh) once from
 this demo checkout after building `build/demo`. It copies the installed native
 libraries and executables into ignored `external/`, and Bennu plus the centroid
 and YOLO model inputs into ignored `assets/`. Its defaults name the source
-paths in the provenance section below. Override `NATIVE_PREFIX`, `SLAM_PREFIX`,
+paths listed in the provenance section below. Override `NATIVE_PREFIX`, `SLAM_PREFIX`,
 `ORT_PREFIX`, `OPENCV_PREFIX`, `OPTIX_ROOT`, `CUDA_LIB_DIR`, `CUDNN_LIB_DIR`,
 `RENDERING_DATA`, `CENTROID_MODEL`, or `YOLO_ROOT` before running it if an
 installation moved. It refuses to mix a new bundle with existing directories;
 inspect or move an older bundle before packaging again.
 
-The folder contract is:
+The bundle uses this directory layout:
 
 ```text
 external/bin/                built demo executables
@@ -86,8 +86,8 @@ The OS loader, glibc, libstdc++, X11/GLFW/OpenGL, codecs, and the NVIDIA driver
 remain host components. Headless use does not require a display. The renderer
 queries the selected logical CUDA device and records its name and compute
 capability in `run.json`; it does not infer a physical index. The copied
-prefixes can be used to rebuild the demo,
-but that still requires a C++20 compiler, CMake, Eigen 3.4, CUDA toolkit 12.9,
+installations can be used to rebuild the demo,
+but the build still requires a C++20 compiler, CMake, Eigen 3.4, CUDA toolkit 12.9,
 OptiX headers, and the host development packages. The bundle does not contain
 the KLT/SLAM source worktrees required to rebuild those libraries from source.
 
@@ -253,11 +253,11 @@ was made.
 
 ## Rebuild on a matching machine
 
-Run commands from the demo repository root. The example below places new
-install prefixes under its ignored deps/ directory. Replace every /path/to
-value. A copied KLT and SLAM working tree must include their dirty source
-state described above. This sequence is adapted from the successful local
-build; the complete transfer has not been exercised on a second machine.
+Run commands from the demo repository root. The example below installs
+dependencies under its ignored `deps/` directory. Replace every `/path/to`
+value. Copy the KLT and SLAM working trees with the uncommitted source changes
+described above. This sequence is adapted from the successful local build;
+the full dependency rebuild has not been exercised on a second machine.
 
     cd /path/to/rendering-to-perception-demos-open-night2026
     DEMO="$PWD"
@@ -312,7 +312,7 @@ transport math.
     cmake --install "$DEMO/build/klt"
 
 For KLT-only operation, omit AutoForge and ONNX Runtime and configure the demo
-with DEMO_ENABLE_ML=OFF. This still builds the render executable and still
+with `DEMO_ENABLE_ML=OFF`. This builds the render executable and
 requires Spectra-RT, CUDA/OptiX, GLFW, and OpenGL. For centroiding or YOLO,
 install AutoForge first:
 
@@ -341,11 +341,11 @@ was skipped. Keep one OpenCV 4.10 installation throughout the C++ builds.
 
 ## Run modes and inputs
 
-All commands below assume the current GPU layout. Run from the demo root so
-the default relative config/camera_rgb_wfov/camera.yaml resolves. Alternatively
-pass an absolute --camera-yaml path. The rendered sensor is fixed to 2048 x
+All commands below use the original machine's GPU layout. Run from the demo root so
+the default relative `config/camera_rgb_wfov/camera.yaml` path resolves. Alternatively,
+pass an absolute `--camera-yaml` path. The rendered sensor is fixed to 2048 x
 1536 Bayer raw with a centered, zero-skew pinhole camera; the bundled YAML is
-the measured-run input. Rendered KLT refuses an incompatible calibration.
+the input used in the recorded runs. Rendered KLT rejects an incompatible calibration.
 
     CUDA_VISIBLE_DEVICES=1 build/demo/render_stream_demo \
       --scene sphere --spp 8 --max-frames 3 --headless \
@@ -375,8 +375,8 @@ bundled sensor profile; no per-frame normalization is used.
 
 The camera program accepts exactly one of --camera-index, --video, or
 --frames-dir. A file source is paced at --fps, default 15. Frame files are
-sorted naturally and must retain one resolution. The physical webcam path
-was drafted and built but not tested with a device on this machine. For
+sorted naturally and must all have the same resolution. Webcam support
+was implemented and built but not tested with a device on this machine. For
 ordinary Earth-scene footage, --klt-extraction generic disables the
 illuminated-body mask; space is the default.
 
@@ -444,7 +444,7 @@ fx=fy=5840.90918 px, cx=1024 px, cy=768 px, and a 1 px MSAC tolerance.
 The demo keeps at most eight positions for drawing each surviving ID, from
 red through orange to yellow. The cache is not a second tracker.
 
-Centroid and KLT consume the same grayscale frame in both mode. The
+Centroiding and KLT consume the same grayscale frame in `both` mode. The
 centroid model outputs normalized [1,2] coordinates; the adapter maps
 them to source pixels without clamping and reports OK, OUTSIDE, or ERROR.
 YOLO consumes the original BGR frame (or a gray-to-BGR copy), reports up
@@ -454,8 +454,8 @@ draws green boxes. Model inference accuracy was not evaluated here.
 The renderer has one worker and GLFW stays on the main thread. The
 camera program has separate capture and processing workers, plus the
 main preview thread. One-slot mailboxes bound backlog. A published
-preview contains results from a single source frame; dropped source and
-processed indices may differ when work falls behind. Console text,
+preview contains results from a single source frame. When processing falls
+behind, dropped frames cause source and processed indices to differ. Console text,
 overlay, and frames.jsonl come from one SFrameSummary. With
 --output-dir, CFrameWriter creates run.json, frames.jsonl, and
 frames/frame_000000.png-style annotated images. Without that flag,
@@ -567,7 +567,7 @@ before trying a long sweep. The source test and runtime evidence above
 establish this machine's behavior; they are not a destination-machine
 validation.
 
-## Where an agent should change things
+## Guidance for future changes
 
 1. Inspect git branch, HEAD, index, unstaged changes, untracked files,
    and worktrees in the demo and every external checkout before editing.

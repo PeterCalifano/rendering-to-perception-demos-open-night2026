@@ -9,7 +9,7 @@ Build two C++20 streaming programs in this repo:
 | `render_stream_demo` | Spectra-RT factorized sensor frames | `klt`, `centroid`, `both` |
 | `camera_stream_demo` | Webcam, video, or image folder | `klt`, `centroid`, `both`, with optional YOLOv7 |
 
-`both` processes one source frame with KLT and centroiding and publishes one combined preview. The required first milestone is physical rendered frames with space-aware KLT tracks that retain IDs across camera motion. Centroiding and YOLOv7 are attempted with available models; record a concrete runtime blocker rather than delaying the KLT programs. No physical webcam is available here, so video and folder inputs supply acceptance evidence.
+`both` processes each source frame with KLT and centroiding and publishes one combined preview. The first milestone is physically rendered frames with space-aware KLT tracks that retain IDs across camera motion. Attempt centroiding and YOLOv7 with available models; record any runtime blocker and continue with the KLT programs. No physical webcam is available here, so use video and folder inputs for acceptance checks.
 
 Before editing source, write this plan, start the goal, and record the current state of every external checkout. Update checkboxes, commands, results, review findings, deferrals, and commit hashes as work advances. A checked item requires evidence. Stop for user review before an external repo source edit; the scalar-texture exception below received that approval on September 25.
 
@@ -66,7 +66,7 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Check low-motion track retention and the high-phase sweep on GPU 1 with MSAC enabled. Review the updated overlay and save a separate filtered evidence clip.
 - [x] Review and commit the rendered-KLT capability using the commit style below.
 
-### 3. Webcam, video, and frames folder
+### 3. Webcam, video, and image folders
 
 - [x] Implement three sources with default space-aware KLT, the same preview, and the same per-frame summary.
 - [x] Generate moving space-like folder fixtures in the behavior test. Verify natural order, EOF, mask outcomes, and ID continuity.
@@ -102,7 +102,7 @@ Before editing source, write this plan, start the goal, and record the current s
 
 ### 7. Local copy bundle (2026-09-25)
 
-- [x] Inventory runtime library closure, installed CMake packages, Bennu assets, and both model sidecars.
+- [x] Inventory all runtime library dependencies, installed CMake packages, Bennu assets, and the supporting files for both models.
 - [x] Copy installed native libraries and executables into ignored `external/`; copy Bennu and model payloads into ignored `assets/` with YOLO manifest-relative paths preserved.
 - [x] Add a launcher that resolves copied libraries before embedded absolute RUNPATH entries and sets the copied Bennu data root.
 - [x] Test relocated sphere+centroid and camera KLT+centroid+YOLO on physical GPU 1; confirm CPU centroid and CUDA YOLO providers.
@@ -124,6 +124,26 @@ Before editing source, write this plan, start the goal, and record the current s
 - [x] Review the GPU selection source, launcher, plan, README, and handoff for simplification, documentation accuracy, formatting, and test evidence; stage only an explicit demo-repo path batch.
 - [x] Obtain explicit authorization to replace the published demo history and sync `peterc-alien16x`; the user granted it on 2026-09-25.
 - [x] Push the signed history with an exact lease, verify GitHub `main`, and sync the second machine from GitHub.
+
+### 10. One-command demo build (2026-09-25)
+
+- [x] Add a root `build.sh` that configures and builds both ML-enabled programs from the copied `external/` packages, without rebuilding external repositories.
+- [x] Document host prerequisites, the script's options, and how to launch its binaries through the bundled library path.
+- [x] Run shell checks, a real configure/build, optional behavior test, and a bounded runtime smoke; review the complete staged diff.
+- [ ] Commit the demo-only build workflow and push it under the user's explicit request; verify the published head.
+
+### 11. Live stage logging (2026-09-25)
+
+- [x] Log completed frame status and labeled stage times in both programs through the KLT logger facility, reusing the existing summary measurements.
+- [x] Document the terminal log level and timing boundaries; verify a rendered and a camera frame, then review the source diff for readability.
+- [ ] Commit the logging capability separately from the build script and push both commits under the user's explicit request.
+
+`./build.sh --tests --jobs 8` configured and built both binaries from `external/` and passed
+`camera_stream_contract` (1/1). `bash -n`, `shellcheck`, argument rejection, and the
+C++ `clang-format` check passed. On GPU 1, a one-frame sphere run logged render,
+readback, reconstruction, KLT, and centroid stages; a one-frame folder run logged
+capture, KLT, centroid, and YOLO stages. `DEMO_LOG_LEVEL=quiet` suppressed the
+demo frame lines. The copied libraries and assets stayed in ignored directories.
 
 ## Review, commit, and comment rules
 
