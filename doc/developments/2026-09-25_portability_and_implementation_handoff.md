@@ -159,8 +159,8 @@ cmake --build "$demo_root/build/portable" -j 8
 | --- | --- | --- |
 | Demo | main, 72575a2 before current portability edits | Copy the complete working folder, including ignored external/ and assets/. Git alone does not carry the payload. |
 | Spectra-RT | feature/implement-factorized-radiometry-mode, fdf46db | The runtime bundle contains its install. For a source rebuild, use this commit. The tracked patch is only for the older f948bd6 revision. Keep unrelated local edits separate. |
-| KLT | feature/space-tailored-extraction, c714e1f | The runtime bundle contains its install. For a source rebuild, copy the working tree with its 28 modified paths or export those changes separately. |
-| SLAM primitives | feature/extend-visual-features-support, 5e54f81 | The runtime bundle contains its install. For a source rebuild, copy the working tree with its 42 status entries, including untracked strong-ID and camera-type headers. |
+| KLT | develop, v0.5.0 (5a44ae7) | The demo requires this version. Rebuild the runtime bundle from this tag. A bundle copied before this update holds 0.3.1. |
+| SLAM primitives | feature/extend-visual-features-support, d4160ab | KLT v0.5.0 builds against this commit. Rebuild the runtime bundle with it. |
 | AutoForge deploy | develop, 03bb25c | The runtime bundle contains its install. Source is needed only when rebuilding that library; the current local edit is documentation only. |
 | ONNX Runtime | installed 1.23.0 | Needed for ML builds. This machine has CPU and CUDA providers in a separate installation. |
 | OptiX SDK | header OPTIX_VERSION 90000 | Needed to build Spectra-RT. This machine used a separate OptiX 9 SDK checkout. |
@@ -179,14 +179,10 @@ Original-machine locations for the copy operation:
     YOLO_MANIFEST=/home/peterc/devDir/ML-repos/torchAutoForge-deploy/examples/model_configs/yolov7_640x640.ptafmodel
     YOLO_ONNX=/home/peterc/devDir/ML-repos/torchAutoForge-deploy/models/onnx/yolov7_640x640.onnx
 
-The KLT checkout has uncommitted changes to its track-ID interface, and the
-demo calls value() on each active strong ID. The SLAM checkout has corresponding
-untracked strong-ID headers. A fresh clone of only c714e1f and 5e54f81 is
-therefore not a verified replacement for those working trees. Preserve their
-source state before moving machines. Their tracked-diff SHA-256 values in this
-snapshot are 4f47f8e18f1a27cbd72ffdc853c358049d9de57fa43c8c7c84be3badae2c233f
-and 9abb5bce9bb5e90270749b0248f641c7020565b8a275d686cbbf1afc2628916c,
-respectively; the latter hash does not include untracked files.
+KLT v0.5.0 and SLAM primitives d4160ab are committed states, so a fresh clone
+of each replaces the earlier working trees. The demo was built and tested
+against these two versions on 2026-11-09. A runtime bundle copied before that
+date holds KLT 0.3.1 and fails the version check in CMakeLists.txt.
 
 The Spectra-RT patch file has SHA-256
 1292775b604623200620b3f43f95165a629d518f2bc4b7b143dfe53701cfe4e3.
