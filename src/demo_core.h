@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include <klt_pipeline/CFrontendKltPipeline.h>
+#include <pyramidal_klt/klt_pipeline/CFrontendKltPipeline.h>
 #include <opencv2/core/mat.hpp>
 
 #include <condition_variable>

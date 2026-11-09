@@ -9,7 +9,7 @@ option(DEMO_ENABLE_ML "Build AutoForge centroid and YOLO adapters" OFF)
 option(DEMO_BUILD_TESTS "Build stream behavior tests" ON)
 
 find_package(OpenCV 4.10 REQUIRED COMPONENTS core imgproc imgcodecs videoio)
-find_package(pyramidal_klt CONFIG REQUIRED)
+find_package(pyramidal_klt 0.5.0 CONFIG REQUIRED)
 find_package(spectra_rt CONFIG REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(OpenGL REQUIRED)
